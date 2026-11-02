@@ -1,0 +1,7 @@
+pyspark>=3.5,<3.6
+confluent-kafka
+onnxruntime
+pyarrow
+pandas
+numpy
+elasticsearch>=8.15,<9

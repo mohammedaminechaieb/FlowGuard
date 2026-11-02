@@ -1,0 +1,26 @@
+# Spark
+checkpoints/
+spark-checkpoints/
+metastore_db/
+derby.log
+spark-warehouse/
+
+# Heavy data (download CICIDS2017 separately)
+data/*.csv
+data/parquet/
+
+# Local config
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
