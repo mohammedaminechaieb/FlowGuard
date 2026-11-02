@@ -96,14 +96,6 @@ If Spark runs inside a container, attach it to the `flowguard-net` network and u
 - "Zero-day" here means "not seen during training".
 - Elasticsearch security is switched off for the demo.
 
-## Team and work split
-
-| Member | Responsibility |
-|---|---|
-| Member A | Docker, Kafka, producer, HDFS archive |
-| Member B | Model training, ONNX export, baselines, evaluation |
-| Member C | Spark streaming job, Elasticsearch, Kibana, latency report |
-
 ## Demo and documents
 
 - Demo video: (link)
