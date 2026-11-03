@@ -1,7 +1,7 @@
 # =============================================================================
 # File        : kafka_producer.py
 # Module      : streaming
-# Owner       : Amine
+# Owner       : Eya
 # Description : Reads CICIDS2017 CSV rows and replays them as JSON messages
 #               into a Kafka topic at a configurable rate (rows/second).
 #               Adds a producer-side timestamp field (send_ts) to each message
