@@ -1,0 +1,4 @@
+# app/requirements_app.txt
+# Packages for the interface: streamlit, elasticsearch (8.x), confluent-kafka, onnxruntime,
+# scikit-learn (same version as used for training, needed to load scaler.pkl),
+# pandas, numpy, plotly, python-dotenv.
