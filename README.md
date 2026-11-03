@@ -6,13 +6,13 @@ Big Data project (II3).
 
 ## Overview
 
-A Python producer replays recorded CICIDS2017 flow records into Kafka. A Spark Structured Streaming job scales each flow, scores it with an autoencoder (ONNX), and flags the flows whose reconstruction error (MSE) is above a threshold. Flagged flows and per-batch metrics are written to Elasticsearch and shown in Kibana. Raw flows are archived to HDFS as Parquet.
+A Python producer replays recorded CICIDS2017 flow records into Kafka. A Spark Structured Streaming job scales each flow, scores it with an autoencoder (ONNX), and flags the flows whose reconstruction error (MSE) is above a threshold. Flagged flows and per-batch metrics are written to Cassandra and shown in Grafana. Raw flows are archived to HDFS as Parquet.
 
 The autoencoder is trained offline only on benign traffic (Monday capture). Every attack in the test days is therefore "unseen during training". The threshold is chosen from benign validation data only.
 
 ## Architecture
 
-    CICIDS2017 CSV -> kafka_producer.py -> Kafka -> Spark Structured Streaming (ONNX autoencoder) -> Elasticsearch -> Kibana
+    CICIDS2017 CSV -> kafka_producer.py -> Kafka -> Spark Structured Streaming (ONNX autoencoder) -> Cassandra -> Grafana
                                              |
                                              +-> Spark -> HDFS (Parquet archive) -> offline training and evaluation
 
@@ -26,15 +26,15 @@ The autoencoder is trained offline only on benign traffic (Monday capture). Ever
 | Model | PyTorch autoencoder, exported to ONNX, scored with onnxruntime in a Pandas UDF |
 | Baselines | Isolation Forest, One-Class SVM, Random Forest (offline) |
 | Archive | HDFS with Parquet |
-| Alert store (NoSQL) | Elasticsearch 8.15 |
-| Dashboard | Kibana 8.15 |
+| Alert store (NoSQL) | Cassandra 5.0 |
+| Dashboard | Grafana 10.4 |
 | Deployment | Docker Compose |
 
 ## Repository structure
 
-    docker/       docker-compose.yml (Kafka, Elasticsearch, Kibana) and the exported Kibana dashboard
+    docker/       docker-compose.yml (Kafka, Cassandra, Grafana) and the exported Grafana dashboard
     ai_module/    data preparation, training, baselines, evaluation, ONNX artifacts
-    streaming/    Kafka producer, Spark jobs, Elasticsearch setup, latency report
+    streaming/    Kafka producer, Spark jobs, Cassandra setup, latency report
     scripts/      spark-submit helper
     data/         CICIDS2017 CSV files (not committed)
     results/      evaluation tables and figures
@@ -54,14 +54,14 @@ The autoencoder is trained offline only on benign traffic (Monday capture). Ever
 
        Copy-Item .env.example .env
 
-2. Start Kafka, Elasticsearch and Kibana
+2. Start Kafka, Cassandra and Grafana
 
        docker compose -f docker/docker-compose.yml up -d
 
-3. Create the Elasticsearch indices
+3. Create the Cassandra schema (wait ~30s for Cassandra to be ready first)
 
        pip install -r streaming/requirements_streaming.txt
-       python streaming/es_setup.py
+       python streaming/cassandra_setup.py
 
 4. Prepare the data and train the model
 
@@ -79,9 +79,10 @@ The autoencoder is trained offline only on benign traffic (Monday capture). Ever
 
        python streaming/kafka_producer.py
 
-7. Open Kibana at http://localhost:5601 and import `docker/kibana/flowguard_dashboard.ndjson`.
+7. Open Grafana at http://localhost:3000 (admin / admin), install the Cassandra plugin
+   (`hadesarchitect-cassandra-datasource`) and import `docker/grafana/flowguard_dashboard.json`.
 
-If Spark runs inside a container, attach it to the `flowguard-net` network and use `kafka:29092` and `http://elasticsearch:9200` in `.env`.
+If Spark runs inside a container, attach it to the `flowguard-net` network and use `kafka:29092` and `cassandra:9042` in `.env`.
 
 ## What we measure
 
@@ -94,7 +95,15 @@ If Spark runs inside a container, attach it to the `flowguard-net` network and u
 - The input is a replay of flow records recorded in 2017, not live packet capture.
 - CICIDS2017 has documented labelling and flow-generation errors.
 - "Zero-day" here means "not seen during training".
-- Elasticsearch security is switched off for the demo.
+- Cassandra and Grafana run without authentication for the demo.
+
+## Team and work split
+
+| Member | Responsibility |
+|---|---|
+| Amine | Data preparation, Autoencoder Training, HDFS archive, Docker infrastructure |
+| Eya | Kafka Producer, ONNX export, baselines, Spark streaming job, Cassandra setup |
+| Mariem | Evaluation, latency report, Grafana dashboard, spark-submit wrapper |
 
 ## Demo and documents
 

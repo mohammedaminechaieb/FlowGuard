@@ -1,7 +1,7 @@
 # =============================================================================
 # File        : train_autoencoder.py
 # Module      : ai_module
-# Owner       : Eya
+# Owner       : Amine
 # Description : Fits a StandardScaler on the benign training split, then trains
 #               a PyTorch autoencoder (encoder-decoder) on those scaled flows.
 #               The anomaly threshold is chosen as the 99th-percentile MSE on

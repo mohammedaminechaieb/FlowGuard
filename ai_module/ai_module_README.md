@@ -7,7 +7,7 @@ Offline training pipeline: data preparation, autoencoder, baselines, evaluation.
 | File | Owner | Role |
 |---|---|---|
 | `prepare_data.py` | **Amine** | Load CICIDS2017 CSVs, clean (inf/NaN, duplicates, column names), split Monday benign into train/validation, write Parquet to HDFS (or `data/parquet/` locally) |
-| `train_autoencoder.py` | **Eya** | Fit StandardScaler on benign train, train PyTorch autoencoder, choose threshold from benign validation MSE, export `autoencoder.onnx`, `scaler.pkl`, `threshold.json` to `artifacts/` |
+| `train_autoencoder.py` | **Amine** | Fit StandardScaler on benign train, train PyTorch autoencoder, choose threshold from benign validation MSE, export `autoencoder.onnx`, `scaler.pkl`, `threshold.json` to `artifacts/` |
 | `train_baselines.py` | **Eya** | Offline baselines on the same split: Isolation Forest, One-Class SVM, Random Forest (supervised upper bound) |
 | `evaluate.py` | **Mariem** | Per-attack-family recall, FPR, ROC-AUC, PR-AUC; mean and std over several seeds; write tables and figures to `results/` |
 | `requirements_ai.txt` | **Amine** | Python dependencies for this module |
