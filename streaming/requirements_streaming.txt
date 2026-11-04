@@ -5,3 +5,4 @@ pyarrow
 pandas
 numpy
 cassandra-driver
+pyasyncore
