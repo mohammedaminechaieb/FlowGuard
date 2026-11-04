@@ -5,3 +5,4 @@ pyarrow
 pandas
 numpy
 elasticsearch>=8.15,<9
+kafka-python
