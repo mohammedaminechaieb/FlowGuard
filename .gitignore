@@ -31,7 +31,7 @@ ENV/
 logs/
 
 # CICIDS2017 datasets
-data/original/*.csv
+data/*.csv
 data/parquet/
 *.parquet
 *.jsonl
