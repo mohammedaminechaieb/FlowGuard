@@ -31,7 +31,7 @@ import onnxruntime as ort
 import pickle
 import pyarrow.parquet as pq
 from sklearn.metrics import (precision_score, 
-                            recall_score,f1_score, 
+                            recall_score,f1_score, fbeta_score,
                             roc_auc_score, average_precision_score, 
                             confusion_matrix)
 
@@ -98,6 +98,7 @@ def evaluate(mse, labels, threshold):
         "precision" : float(precision_score(y_true, y_pred)),
         "recall" : float(recall_score(y_true, y_pred)),
         "f1" : float(f1_score(y_true, y_pred)),
+        "f2" : float(fbeta_score(y_true, y_pred, beta=2)),
         "false_positive_rate" : float(fp / (fp + tn)),
         "roc_auc" : float(roc_auc_score(y_true, mse)),
         "pr_auc" : float(average_precision_score(y_true, mse)),
