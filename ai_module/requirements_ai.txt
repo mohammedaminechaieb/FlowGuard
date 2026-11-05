@@ -1,6 +1,7 @@
 torch
 onnx
 onnxruntime
+onnxscript
 scikit-learn
 pandas
 numpy
