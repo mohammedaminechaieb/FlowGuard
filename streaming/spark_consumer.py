@@ -1,42 +1,28 @@
-
-# =============================================================================
-# File        : spark_processor.py
-# Module      : streaming
-# Description : Main Spark Structured Streaming job for FlowGuard.
-#
-# Pipeline:
-#   1. Read JSON messages from Kafka
-#   2. Parse and cast event fields
-#   3. Extract network flow features
-#   4. Display received events
-#
-# Input:
-#   Kafka topic: network-telemetry
-#
-# Output:
-#   Spark console
-# =============================================================================
-
-from pathlib import Path
 import os
 import sys
+import json
+import logging
+from pathlib import Path
 
-import pyspark
+import numpy as np
+import pandas as pd
+import joblib
+import onnxruntime as ort
 
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     col,
-    from_json,
-    size,
-    map_entries,
-    slice
+    from_json
 )
 from pyspark.sql.types import (
     StructType,
     StructField,
     StringType,
     MapType,
-    DoubleType
+    DoubleType,
+    TimestampType,
+    IntegerType,
+    LongType
 )
 
 
@@ -44,171 +30,144 @@ from pyspark.sql.types import (
 # 1. CONFIGURATION
 # ============================================================
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+MODEL_DIR = Path(
+    os.getenv("MODEL_DIR", str(BASE_DIR / "models"))
+)
+
+SCALER_PATH = MODEL_DIR / "scaler.pkl"
+ONNX_PATH = MODEL_DIR / "autoencoder.onnx"
+FEATURES_PATH = MODEL_DIR / "feature_columns.json"
+
 KAFKA_BOOTSTRAP_SERVERS = os.getenv(
     "KAFKA_BOOTSTRAP_SERVERS",
     "localhost:9092"
 )
 
-KAFKA_TOPIC = os.getenv(
-    "KAFKA_TOPIC",
-    "network-telemetry"
+KAFKA_TOPIC = "network-telemetry"
+
+CHECKPOINT_PATH = os.getenv(
+    "CHECKPOINT_PATH",
+    str(BASE_DIR / "checkpoints" / "spark_inference")
 )
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+THRESHOLD = 0.03222443163394928
 
-CHECKPOINT_DIR = (
-    BASE_DIR / "checkpoints" / "spark_kafka_consumer"
-)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("FlowGuard")
 
 
 # ============================================================
-# 2. SPARK AND KAFKA CONNECTOR VERSIONS
+# 2. CHARGEMENT DE LA LISTE DES FEATURES
 # ============================================================
 
-SPARK_VERSION = pyspark.__version__
+if not FEATURES_PATH.exists():
+    raise FileNotFoundError(
+        f"Fichier des features introuvable : {FEATURES_PATH}"
+    )
 
-SPARK_MAJOR_VERSION = int(SPARK_VERSION.split(".")[0])
+with open(FEATURES_PATH, "r", encoding="utf-8") as file:
+    FEATURE_COLUMNS = json.load(file)
 
-if SPARK_MAJOR_VERSION >= 4:
-    SCALA_VERSION = "2.13"
-else:
-    SCALA_VERSION = "2.12"
+if not isinstance(FEATURE_COLUMNS, list):
+    raise ValueError(
+        "feature_columns.json doit contenir une liste de noms."
+    )
 
-KAFKA_PACKAGE = (
-    f"org.apache.spark:spark-sql-kafka-0-10_"
-    f"{SCALA_VERSION}:{SPARK_VERSION}"
-)
+if len(FEATURE_COLUMNS) != 78:
+    raise ValueError(
+        f"78 features attendues, {len(FEATURE_COLUMNS)} trouvées."
+    )
+
+if len(set(FEATURE_COLUMNS)) != 78:
+    raise ValueError("La liste contient des features en double.")
+
+# Noms internes sans caractère spécial. Certains noms CICIDS2017 contiennent
+# un point ("Fwd Header Length.1") ou un "/" : Spark lirait le point comme
+# l'accès à un champ imbriqué. L'ordre des alias suit exactement celui de
+# feature_columns.json, donc celui attendu par le scaler et le modèle.
+FEATURE_ALIASES = [f"f{i}" for i in range(len(FEATURE_COLUMNS))]
+
+logger.info("Nombre de features : %s", len(FEATURE_COLUMNS))
 
 
 # ============================================================
-# 3. JSON EVENT SCHEMA
+# 3. SCHEMA KAFKA
 # ============================================================
 
 EVENT_SCHEMA = StructType([
     StructField("event_id", StringType(), True),
     StructField("dataset", StringType(), True),
-
     StructField(
         "features",
-        MapType(
-            StringType(),
-            DoubleType(),
-            True
-        ),
+        MapType(StringType(), DoubleType()),
         True
     ),
-
     StructField("label", StringType(), True)
 ])
 
 
 # ============================================================
-# 4. INITIALIZE SPARK
+# 4. INITIALISATION SPARK
 # ============================================================
 
 def create_spark_session():
 
-    print("=" * 65)
-    print("FLOWGUARD - SPARK STREAMING")
-    print("=" * 65)
-
-    print(f"Spark version : {SPARK_VERSION}")
-    print(f"Kafka server  : {KAFKA_BOOTSTRAP_SERVERS}")
-    print(f"Kafka topic   : {KAFKA_TOPIC}")
-    print(f"Kafka package : {KAFKA_PACKAGE}")
-
-    print("=" * 65)
-
-    spark = (
+    return (
         SparkSession.builder
-        .appName("FlowGuard-Spark-Processor")
-        .master("local[*]")
+        .appName("FlowGuard-NIDS")
         .config(
             "spark.jars.packages",
-            KAFKA_PACKAGE
+            "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3"
         )
-        .config(
-            "spark.sql.shuffle.partitions",
-            "3"
-        )
-        .config(
-            "spark.sql.streaming.forceDeleteTempCheckpointLocation",
-            "false"
-        )
+        .config("spark.sql.shuffle.partitions", "4")
         .getOrCreate()
     )
 
-    spark.sparkContext.setLogLevel("WARN")
-
-    print("[SUCCESS] Spark session initialized.")
-
-    return spark
-
 
 # ============================================================
-# 5. READ EVENTS FROM KAFKA
+# 5. LECTURE DE KAFKA
 # ============================================================
 
 def read_from_kafka(spark):
 
-    print("[INFO] Connecting to Kafka...")
+    logger.info("Connexion à Kafka : %s", KAFKA_BOOTSTRAP_SERVERS)
 
-    kafka_stream = (
+    return (
         spark.readStream
         .format("kafka")
-        .option(
-            "kafka.bootstrap.servers",
-            KAFKA_BOOTSTRAP_SERVERS
-        )
-        .option(
-            "subscribe",
-            KAFKA_TOPIC
-        )
-        .option(
-            "startingOffsets",
-            "earliest"
-        )
-        .option(
-            "failOnDataLoss",
-            "false"
-        )
-        .option(
-            "maxOffsetsPerTrigger",
-            "500"
-        )
+        .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP_SERVERS)
+        .option("subscribe", KAFKA_TOPIC)
+        .option("startingOffsets", "earliest")
+        .option("failOnDataLoss", "false")
+        .option("maxOffsetsPerTrigger", "500")
         .load()
     )
 
-    print("[SUCCESS] Kafka stream configured.")
-
-    return kafka_stream
-
 
 # ============================================================
-# 6. PARSE JSON EVENTS
+# 6. PARSING DES EVENEMENTS
 # ============================================================
 
-def parse_events(kafka_stream):
+def parse_events(kafka_df):
 
-    print("[INFO] Parsing Kafka messages...")
-
-    parsed_stream = (
-        kafka_stream
+    parsed_df = (
+        kafka_df
         .select(
             col("timestamp").alias("kafka_timestamp"),
-            col("partition"),
-            col("offset"),
-
-            from_json(
-                col("value").cast("string"),
-                EVENT_SCHEMA
-            ).alias("event")
+            col("partition").alias("kafka_partition"),
+            col("offset").alias("kafka_offset"),
+            col("value").cast("string").alias("json_value")
+        )
+        .withColumn(
+            "event",
+            from_json(col("json_value"), EVENT_SCHEMA)
         )
         .select(
-            "kafka_timestamp",
-            "partition",
-            "offset",
-
+            col("kafka_timestamp"),
+            col("kafka_partition"),
+            col("kafka_offset"),
             col("event.event_id").alias("event_id"),
             col("event.dataset").alias("dataset"),
             col("event.features").alias("features"),
@@ -216,122 +175,195 @@ def parse_events(kafka_stream):
         )
     )
 
-    return parsed_stream
+    return parsed_df
 
 
 # ============================================================
-# 7. DISPLAY RECEIVED EVENTS
+# 7. PREPARATION DES 78 FEATURES
 # ============================================================
 
-def display_events(parsed_stream):
+def prepare_features(parsed_df):
 
-    print("[INFO] Preparing console output...")
+    # getItem lit la clé du dictionnaire telle quelle (point et "/" compris),
+    # puis la colonne est renommée avec un alias sûr (f0 ... f77).
+    feature_expressions = [
+        col("features").getItem(feature).cast("double").alias(alias)
+        for feature, alias in zip(FEATURE_COLUMNS, FEATURE_ALIASES)
+    ]
 
-    display_stream = (
-        parsed_stream
-        .select(
-            "kafka_timestamp",
-            "partition",
-            "offset",
-            "event_id",
-            "dataset",
-            "label",
-
-            size(
-                col("features")
-            ).alias("feature_count"),
-
-            slice(
-                map_entries(col("features")),
-                1,
-                5
-            ).alias("first_5_features")
-        )
+    return parsed_df.select(
+        "kafka_timestamp",
+        "kafka_partition",
+        "kafka_offset",
+        "event_id",
+        "dataset",
+        "label",
+        *feature_expressions
     )
 
-    query = (
-        display_stream.writeStream
-        .format("console")
-        .outputMode("append")
-        .option(
-            "truncate",
-            "false"
-        )
-        .option(
-            "numRows",
-            "5"
-        )
-        .option(
-            "checkpointLocation",
-            str(CHECKPOINT_DIR)
-        )
-        .trigger(
-            processingTime="5 seconds"
-        )
-        .start()
+
+# ============================================================
+# 8. INFERENCE ONNX ET CALCUL DU MSE
+# ============================================================
+
+OUTPUT_SCHEMA = StructType([
+    StructField("kafka_timestamp", TimestampType(), True),
+    StructField("kafka_partition", IntegerType(), True),
+    StructField("kafka_offset", LongType(), True),
+    StructField("event_id", StringType(), True),
+    StructField("dataset", StringType(), True),
+    StructField("label", StringType(), True),
+    StructField("mse", DoubleType(), True),
+    StructField("prediction", StringType(), True)
+])
+
+
+def worker_log(message):
+    # Les logs Python des processus de travail ne passent pas par le logging
+    # configuré dans le pilote : on écrit directement sur stderr pour que le
+    # message apparaisse dans `docker logs`.
+    print(message, file=sys.stderr, flush=True)
+
+
+def run_inference(iterator):
+
+    scaler = joblib.load(str(SCALER_PATH))
+    session = ort.InferenceSession(
+        str(ONNX_PATH),
+        providers=["CPUExecutionProvider"]
     )
+    input_name = session.get_inputs()[0].name
+    output_name = session.get_outputs()[0].name
 
-    print("[SUCCESS] Spark Streaming started.")
-    print("[INFO] Waiting for Kafka events...")
+    for pdf in iterator:
+        if pdf.empty:
+            continue
 
-    return query
+        X = pdf[FEATURE_ALIASES].to_numpy(dtype=np.float32, copy=True)
+        valid_mask = np.isfinite(X).all(axis=1)
+
+        dropped = int((~valid_mask).sum())
+        if dropped:
+            worker_log(
+                f"[INFERENCE] {dropped} événement(s) écarté(s) : valeur "
+                f"manquante ou infinie dans les features."
+            )
+
+        if not valid_mask.any():
+            continue
+
+        valid_pdf = pdf.loc[valid_mask].copy()
+        X = X[valid_mask]
+
+        X_scaled = scaler.transform(X).astype(np.float32)
+
+        reconstructed = session.run([output_name], {input_name: X_scaled})[0]
+        reconstructed = np.asarray(reconstructed, dtype=np.float32)
+
+        mse_values = np.mean(np.square(X_scaled - reconstructed), axis=1)
+        predictions = np.where(mse_values > THRESHOLD, "ANOMALY", "BENIGN")
+
+        worker_log(f"[INFERENCE] {len(predictions)} événements scorés par l'autoencodeur.")
+
+        yield pd.DataFrame({
+            "kafka_timestamp": valid_pdf["kafka_timestamp"].values,
+            "kafka_partition": valid_pdf["kafka_partition"].values,
+            "kafka_offset": valid_pdf["kafka_offset"].values,
+            "event_id": valid_pdf["event_id"].values,
+            "dataset": valid_pdf["dataset"].values,
+            "label": valid_pdf["label"].values,
+            "mse": mse_values.astype(float),
+            "prediction": predictions
+        })
 
 
 # ============================================================
-# 8. MAIN
+# 9. BILAN PAR BATCH (diagnostic)
+# ============================================================
+
+def log_batch(batch_df, batch_id):
+
+    # persist() évite de relancer le modèle ONNX à chaque action ci-dessous.
+    batch_df.persist()
+
+    count = batch_df.count()
+
+    if count:
+        print(f"\n[BATCH {batch_id}] {count} événements scorés", flush=True)
+
+        batch_df.groupBy("label", "prediction").count().show(truncate=False)
+
+        batch_df.orderBy("kafka_offset").show(20, truncate=False)
+
+    batch_df.unpersist()
+
+# ============================================================
+# 7. EXPORT BATCH VERS CASSANDRA (TOUT LE FLUX + ALERTES)
+# ============================================================
+
+def write_to_cassandra(batch_df, batch_id):
+    batch_df.persist()
+    count = batch_df.count()
+
+    if count > 0:
+        print(f"\n[BATCH {batch_id}] {count} événements traités.", flush=True)
+
+        # 1. Écriture de l'intégralité du flux dans la table `all_flows`
+        batch_df.write \
+            .format("org.apache.spark.sql.cassandra") \
+            .option("keyspace", CASSANDRA_KEYSPACE) \
+            .option("table", TABLE_ALL_FLOWS) \
+            .mode("append") \
+            .save()
+        print(f"[CASSANDRA] {count} flux enregistrés dans {CASSANDRA_KEYSPACE}.{TABLE_ALL_FLOWS}", flush=True)
+
+        # 2. Écriture filtrée des alertes dans la table `alerts`
+        alerts_df = batch_df.filter(col("prediction") == "ANOMALY")
+        alerts_count = alerts_df.count()
+
+        if alerts_count > 0:
+            alerts_df.write \
+                .format("org.apache.spark.sql.cassandra") \
+                .option("keyspace", CASSANDRA_KEYSPACE) \
+                .option("table", TABLE_ALERTS) \
+                .mode("append") \
+                .save()
+            print(f"[ALERTES] {alerts_count} anomalies enregistrées dans {CASSANDRA_KEYSPACE}.{TABLE_ALERTS}", flush=True)
+
+    batch_df.unpersist()
+
+
+# ============================================================
+# 8. MAIN STREAMING PIPELINE
 # ============================================================
 
 def main():
+    spark = create_spark_session()
+    spark.sparkContext.setLogLevel("WARN")
 
-    spark = None
-    query = None
+    logger.info("FlowGuard - Démarrage de l'inférence et de l'export Cassandra...")
 
-    try:
+    kafka_df = read_from_kafka(spark)
+    parsed_df = parse_events(kafka_df)
+    features_df = prepare_features(parsed_df)
 
-        # Initialize Spark
-        spark = create_spark_session()
+    predictions_df = features_df.mapInPandas(
+        run_inference,
+        schema=OUTPUT_SCHEMA
+    )
 
-        # Read Kafka stream
-        kafka_stream = read_from_kafka(spark)
+    query = (
+        predictions_df
+        .writeStream
+        .foreachBatch(write_to_cassandra)
+        .outputMode("append")
+        .option("checkpointLocation", CHECKPOINT_PATH)
+        .trigger(processingTime="5 seconds")
+        .start()
+    )
 
-        # Parse JSON messages
-        parsed_stream = parse_events(kafka_stream)
+    query.awaitTermination()
 
-        # Display events
-        query = display_events(parsed_stream)
-
-        # Keep streaming alive
-        query.awaitTermination()
-
-    except KeyboardInterrupt:
-
-        print("\n[INFO] Stopping FlowGuard Spark processor...")
-
-    except Exception as error:
-
-        print(f"\n[ERROR] Spark processing failed: {error}")
-
-        raise
-
-    finally:
-
-        if query is not None and query.isActive:
-
-            query.stop()
-
-        if spark is not None:
-
-            spark.stop()
-
-            print("[INFO] Spark session stopped.")
-
-        print("[INFO] FlowGuard processor terminated.")
-
-
-# ============================================================
-# 9. ENTRY POINT
-# ============================================================
 
 if __name__ == "__main__":
-
     main()
