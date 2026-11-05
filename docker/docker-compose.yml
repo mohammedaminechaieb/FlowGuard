@@ -1,3 +1,5 @@
+version: "3.8"
+
 services:
   kafka:
     image: apache/kafka:3.8.0
@@ -17,33 +19,12 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-
-  
-  
-  spark:
-    image: apache/spark:3.5.3
-    container_name: flowguard-spark
-    depends_on:
-      - kafka
-    working_dir: /opt/flowguard
-    environment:
-      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      HOME: /tmp
-      SPARK_LOCAL_DIRS: /tmp/spark-local
-      SPARK_SUBMIT_OPTS: "-Divy.home=/tmp/.ivy2 -Divy.cache.dir=/tmp/.ivy2/cache"
-    volumes:
-      - ../streaming:/opt/flowguard/streaming:ro
-      - ../checkpoints:/opt/flowguard/checkpoints
-    command:
-      - /opt/spark/bin/spark-submit
-      - --master
-      - local[*]
-      - --packages
-      - org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3
-      - /opt/flowguard/streaming/spark_consumer.py
-    restart: unless-stopped
-
-
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
 
   cassandra:
     image: cassandra:5.0
@@ -52,18 +33,64 @@ services:
       - "9042:9042"
     environment:
       CASSANDRA_CLUSTER_NAME: flowguard
+      CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
       CASSANDRA_DC: datacenter1
       CASSANDRA_RACK: rack1
     volumes:
       - cassandra_data:/var/lib/cassandra
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'DESCRIBE KEYSPACES' > /dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+
+  spark:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.spark
+      network: host
+    image: flowguard-spark:latest
+    container_name: flowguard-spark
+    user: root
+    depends_on:
+      kafka:
+        condition: service_healthy
+      cassandra:
+        condition: service_healthy
+    working_dir: /opt/flowguard
+    ports:
+      - "4040:4040"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      CASSANDRA_HOST: cassandra
+      HADOOP_USER_NAME: spark
+      MODEL_DIR: /opt/flowguard/models
+      PYTHONUNBUFFERED: "1"
+      HOME: /tmp
+      SPARK_LOCAL_DIRS: /tmp/spark-local
+      SPARK_SUBMIT_OPTS: "-Divy.home=/tmp/.ivy2 -Divy.cache.dir=/tmp/.ivy2/cache --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/sun.misc=ALL-UNNAMED"
+    volumes:
+      - ../streaming:/opt/flowguard/streaming:ro
+      - ../models:/opt/flowguard/models:ro
+      - ../checkpoints:/opt/flowguard/checkpoints
+    command:
+      - /opt/spark/bin/spark-submit
+      - --master
+      - local[*]
+      - --packages
+      - org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3,com.datastax.spark:spark-cassandra-connector_2.12:3.5.0
+      - /opt/flowguard/streaming/spark_consumer.py
+    restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:10.4.2
     container_name: grafana
     ports:
       - "3000:3000"
     depends_on:
-      - cassandra
+      cassandra:
+        condition: service_healthy
     volumes:
       - grafana_data:/var/lib/grafana
     environment:
