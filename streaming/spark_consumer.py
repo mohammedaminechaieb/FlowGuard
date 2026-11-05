@@ -47,6 +47,10 @@ KAFKA_BOOTSTRAP_SERVERS = os.getenv(
 
 KAFKA_TOPIC = "network-telemetry"
 
+CASSANDRA_KEYSPACE = os.getenv("CASSANDRA_KEYSPACE", "flowguard")
+TABLE_ALL_FLOWS = "all_flows"
+TABLE_ALERTS = "alerts"
+
 CHECKPOINT_PATH = os.getenv(
     "CHECKPOINT_PATH",
     str(BASE_DIR / "checkpoints" / "spark_inference")
