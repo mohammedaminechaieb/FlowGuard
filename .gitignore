@@ -35,6 +35,7 @@ data/*.csv
 data/parquet/
 *.parquet
 *.jsonl
+data/archive/
 
 # ML models
 models/
