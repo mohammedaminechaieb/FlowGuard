@@ -146,7 +146,7 @@ def read_from_kafka(spark):
         .option("subscribe", KAFKA_TOPIC)
         .option("startingOffsets", "earliest")
         .option("failOnDataLoss", "false")
-        .option("maxOffsetsPerTrigger", "500")
+        .option("maxOffsetsPerTrigger", os.getenv("MAX_OFFSETS_PER_TRIGGER", "500"))
         .load()
     )
 
@@ -222,7 +222,8 @@ OUTPUT_SCHEMA = StructType([
     StructField("label", StringType(), True),
     StructField("mse", DoubleType(), True),
     StructField("prediction", StringType(), True),
-    StructField("latency_ms", DoubleType(), True)
+    StructField("latency_ms", DoubleType(), True),
+    StructField("scored_at", TimestampType(), True)
 ])
 
 
@@ -276,6 +277,7 @@ def run_inference(iterator):
         # Latence producer -> score (ms). Ancien message sans send_ts -> null.
         send_ts = pd.to_numeric(valid_pdf["send_ts"], errors="coerce").to_numpy(dtype=float)
         latency_ms = pd.array((time.time() - send_ts) * 1000.0, dtype="Float64")
+        scored_at = pd.Timestamp.now(tz="UTC")  # moment où Spark a scoré le batch
 
         yield pd.DataFrame({
             "kafka_timestamp": valid_pdf["kafka_timestamp"].values,
@@ -286,7 +288,8 @@ def run_inference(iterator):
             "label": valid_pdf["label"].values,
             "mse": mse_values.astype(float),
             "prediction": predictions,
-            "latency_ms": latency_ms
+            "latency_ms": latency_ms,
+            "scored_at": [scored_at] * len(predictions)
         }) 
 
 # ============================================================

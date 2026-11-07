@@ -83,6 +83,7 @@ services:
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       MODEL_DIR: /opt/flowguard/models
+      MAX_OFFSETS_PER_TRIGGER: ${MAX_OFFSETS_PER_TRIGGER:-500}
       CHECKPOINT_PATH: /opt/flowguard/checkpoints/spark_inference
       HOME: /tmp
       PYTHONUNBUFFERED: "1"

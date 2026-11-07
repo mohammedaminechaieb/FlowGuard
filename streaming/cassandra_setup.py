@@ -56,6 +56,7 @@ def create_cassandra_schema():
             mse double,
             prediction text,
             latency_ms double,
+            scored_at timestamp,
             PRIMARY KEY ((dataset), kafka_timestamp, kafka_partition, kafka_offset)
         ) WITH CLUSTERING ORDER BY (kafka_timestamp DESC, kafka_partition ASC, kafka_offset ASC);
     """)
@@ -73,6 +74,7 @@ def create_cassandra_schema():
             mse double,
             prediction text,
             latency_ms double,
+            scored_at timestamp,
             PRIMARY KEY ((dataset), kafka_timestamp, kafka_partition, kafka_offset)
         ) WITH CLUSTERING ORDER BY (kafka_timestamp DESC, kafka_partition ASC, kafka_offset ASC);
     """)
