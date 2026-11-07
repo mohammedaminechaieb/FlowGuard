@@ -6,3 +6,4 @@ pandas
 numpy
 kafka-python
 cassandra-driver
+pyasyncore

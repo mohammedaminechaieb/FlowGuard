@@ -93,6 +93,7 @@ services:
         condition: service_healthy
     environment:
       GF_SECURITY_ADMIN_PASSWORD: admin   # demo only
+      # this is a plugin not a package so it belongs here not in the requirements.txt file
       GF_INSTALL_PLUGINS: hadesarchitect-cassandra-datasource
     volumes:
       - grafana_data:/var/lib/grafana
