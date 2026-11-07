@@ -1,7 +1,7 @@
 # =============================================================================
 # File        : latency_report.py
 # Module      : streaming
-# Owner       : Mariem
+# Owner       : Amine
 # Description : End-to-end latency and throughput report for the stream.
 #               - Latency: per-event latency_ms (producer send -> Spark score)
 #                 read from flowguard.all_flows -> p50 / p95 / p99 / mean / max

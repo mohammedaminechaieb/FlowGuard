@@ -6,10 +6,10 @@ Infrastructure: Kafka (KRaft), Cassandra 5.0, Spark 3.5 (Python 3.11, Java 17), 
 
 | File | Owner | Role |
 |---|---|---|
-| `docker-compose.yml` | **Amine** | All services and the shared `flowguard-net` network |
-| `spark.Dockerfile` | **Amine** | Spark image: Python 3.11, Java 17, PySpark 3.5.3 and the model libraries (versions match the artifacts) |
-| `Grafana/provisioning/` | **Mariem** | Cassandra data source and dashboard provider, loaded automatically at Grafana start |
-| `Grafana/dashboards/flowguard_dashboard.json` | **Mariem** | FlowGuard dashboard |
+| `docker-compose.yml` | **Amine & Eya** | All services and the shared `flowguard-net` network |
+| `spark.Dockerfile` | **Amine & Eya** | Spark image: Python 3.11, Java 17, PySpark 3.5.3 and the model libraries (versions match the artifacts) |
+| `Grafana/provisioning/` | **Amine** | Automatic setup at Grafana start: Cassandra data source and dashboard provider |
+| `Grafana/dashboards/flowguard_dashboard.json` | **Amine** (from **Mariem**'s manual prototype) | FlowGuard dashboard as code, loaded automatically |
 
 ## Services
 
