@@ -1,7 +1,7 @@
 # =============================================================================
 # File        : train_baselines.py
 # Module      : ai_module
-# Owner       : Eya
+# Owner       : Amine
 # Description : Trains three offline baseline models on the same benign
 #               train/validation split used by the autoencoder:
 #                 - Isolation Forest (unsupervised)

@@ -97,8 +97,8 @@ The autoencoder is trained offline only on benign traffic (Monday capture). Ever
 
 | Member | Responsibility |
 |---|---|
-| Amine | Data preparation, autoencoder training and ONNX export, evaluation, latency report, HDFS archive, spark-submit wrapper, Docker infrastructure and automation (automatic Cassandra schema, Grafana provisioning and dashboard as code, Spark image fixes) |
-| Eya | Kafka producer, Spark streaming job, Spark Docker image, offline check script, baselines |
+| Amine | Data preparation, autoencoder training and ONNX export, evaluation, latency report, HDFS archive, spark-submit wrapper, Docker infrastructure and automation (automatic Cassandra schema, Grafana provisioning and dashboard as code, Spark image fixes), baselines |
+| Eya | Kafka producer, Spark streaming job, Spark Docker image, offline check script |
 | Mariem | Cassandra schema, Cassandra test script and sample data, Grafana dashboard prototype |
 
 ## Demo and documents

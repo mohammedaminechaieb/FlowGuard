@@ -15,11 +15,11 @@ Every member contributes to all modules. The table below shows who owns which fi
 | `ai_module` | `requirements_ai.txt` | AI module dependencies |
 | `streaming` | `archive_raw_stream.py` | Archive the raw stream to HDFS as Parquet |
 | `streaming` | `latency_report.py` | p50/p95/p99 latency and throughput report |
-| `streaming` | `requirements_streaming.txt` | Streaming module dependencies |
 | `scripts` | `submit_spark.sh` | spark-submit wrapper (outside Docker) |
 | `docker` | `docker-compose.yml` | All services, automatic Cassandra schema (`cassandra-init`), HDFS archive job |
 | `docker` | `Grafana/` | Grafana provisioning and automatic FlowGuard dashboard (dashboard as code) |
 | `ai_module` | `train_baselines.py` | Isolation Forest, One-Class SVM, Random Forest baselines |
+
 ---
 
 ## Eya — Modelling & Stream Processing
@@ -40,6 +40,7 @@ Every member contributes to all modules. The table below shows who owns which fi
 | `streaming` | `cassandra_setup.py` | Create Cassandra keyspace and tables |
 | `streaming` | `test_insert.py` | Cassandra smoke test |
 | `streaming` | `sampled_cassandra_data.cql` | Sample rows for testing Grafana |
+| `streaming` | `requirements_streaming.txt` | Streaming module dependencies |
 | `docker` | Grafana (UI) | First dashboard prototype built manually in Grafana, used to validate the Cassandra queries |
 
 ---
@@ -64,5 +65,5 @@ Amine: docker compose up (cassandra-init ◄─ Mariem: cassandra_setup.py) ─�
 Eya:   kafka_producer.py ──► Kafka ──┘                                     │
                                      └──► Amine: archive_raw_stream.py ──► HDFS
 Amine: evaluate.py, latency_report.py ──► results/
-Amine:   train_baselines.py ──► evaluate.py
+Amine: train_baselines.py ──► evaluate.py
 ```
