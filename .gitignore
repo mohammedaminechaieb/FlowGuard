@@ -37,6 +37,9 @@ data/parquet/
 *.jsonl
 data/archive/
 
+# Baseline models are large and can be retrained with train_baselines.py
+ai_module/artifacts/baselines/
+
 # Spark
 spark-warehouse/
 metastore_db/
