@@ -13,14 +13,12 @@
 #               streaming/spark_processor.py
 # Output      : running Spark Structured Streaming job
 # =============================================================================
-set -e
-SPARK_VERSION=""
+set -euo pipefail
+# Usage: bash scripts/submit_spark.sh                                 (inference job)
+#        bash scripts/submit_spark.sh streaming/archive_raw_stream.py  (archive job)
+SPARK_VERSION="${SPARK_VERSION:-3.5.3}"
+JOB="${1:-streaming/spark_consumer.py}"
 spark-submit \
-  --packages org.apache.spark:spark-sql-kafka-0-10_2.12: \
-  streaming/spark_processor.py#!/usr/bin/env bash
-# Run from the project root. SPARK_VERSION must match the Spark version of the image.
-set -e
-SPARK_VERSION="${SPARK_VERSION:-3.5.1}"
-spark-submit \
-  --packages org.apache.spark:spark-sql-kafka-0-10_2.12:${SPARK_VERSION} \
-  streaming/spark_consumer.py
+  --packages "org.apache.spark:spark-sql-kafka-0-10_2.12:${SPARK_VERSION},com.datastax.spark:spark-cassandra-connector_2.12:3.5.1" \
+  --conf "spark.cassandra.connection.host=${CASSANDRA_HOST:-localhost}" \
+  "$JOB"

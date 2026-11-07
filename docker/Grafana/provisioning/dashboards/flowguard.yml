@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: FlowGuard
+    folder: FlowGuard
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/dashboards

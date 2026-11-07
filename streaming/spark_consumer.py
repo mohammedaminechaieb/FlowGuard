@@ -1,8 +1,10 @@
 import os
 import sys
 import json
+import time
 import logging
 from pathlib import Path
+from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
@@ -10,6 +12,7 @@ import joblib
 import onnxruntime as ort
 
 from pyspark.sql import SparkSession
+from pyspark.sql import functions as F
 from pyspark.sql.functions import (
     col,
     from_json
@@ -108,7 +111,8 @@ EVENT_SCHEMA = StructType([
         MapType(StringType(), DoubleType()),
         True
     ),
-    StructField("label", StringType(), True)
+    StructField("label", StringType(), True),
+    StructField("send_ts", DoubleType(), True)
 ])
 
 
@@ -175,7 +179,8 @@ def parse_events(kafka_df):
             col("event.event_id").alias("event_id"),
             col("event.dataset").alias("dataset"),
             col("event.features").alias("features"),
-            col("event.label").alias("label")
+            col("event.label").alias("label"),
+            col("event.send_ts").alias("send_ts")
         )
     )
 
@@ -202,6 +207,7 @@ def prepare_features(parsed_df):
         "event_id",
         "dataset",
         "label",
+        "send_ts",
         *feature_expressions
     )
 
@@ -218,7 +224,8 @@ OUTPUT_SCHEMA = StructType([
     StructField("dataset", StringType(), True),
     StructField("label", StringType(), True),
     StructField("mse", DoubleType(), True),
-    StructField("prediction", StringType(), True)
+    StructField("prediction", StringType(), True),
+    StructField("latency_ms", DoubleType(), True)
 ])
 
 
@@ -268,6 +275,10 @@ def run_inference(iterator):
         predictions = np.where(mse_values > THRESHOLD, "ANOMALY", "BENIGN")
 
         worker_log(f"[INFERENCE] {len(predictions)} événements scorés par l'autoencodeur.")
+        
+        # Latence producer -> score (ms). Ancien message sans send_ts -> null.
+        send_ts = pd.to_numeric(valid_pdf["send_ts"], errors="coerce").to_numpy(dtype=float)
+        latency_ms = pd.array((time.time() - send_ts) * 1000.0, dtype="Float64")
 
         yield pd.DataFrame({
             "kafka_timestamp": valid_pdf["kafka_timestamp"].values,
@@ -277,8 +288,9 @@ def run_inference(iterator):
             "dataset": valid_pdf["dataset"].values,
             "label": valid_pdf["label"].values,
             "mse": mse_values.astype(float),
-            "prediction": predictions
-        })
+            "prediction": predictions,
+            "latency_ms": latency_ms
+        }) 
 
 
 # ============================================================
@@ -304,8 +316,71 @@ def log_batch(batch_df, batch_id):
 # ============================================================
 # 7. EXPORT BATCH VERS CASSANDRA (TOUT LE FLUX + ALERTES)
 # ============================================================
+TABLE_BATCH_METRICS = "batch_metrics"
+
+BATCH_METRICS_SCHEMA = StructType([
+    StructField("pipeline", StringType(), False),
+    StructField("batch_time", TimestampType(), False),
+    StructField("batch_id", LongType(), True),
+    StructField("flows", IntegerType(), True),
+    StructField("anomalies", IntegerType(), True),
+    StructField("anomaly_rate", DoubleType(), True),
+    StructField("avg_mse", DoubleType(), True),
+    StructField("max_mse", DoubleType(), True),
+    StructField("latency_p50_ms", DoubleType(), True),
+    StructField("latency_p95_ms", DoubleType(), True),
+    StructField("latency_p99_ms", DoubleType(), True),
+    StructField("latency_max_ms", DoubleType(), True),
+    StructField("processing_s", DoubleType(), True),
+    StructField("throughput_eps", DoubleType(), True)
+])
+
+
+def write_batch_metrics(batch_df, batch_id, count, alerts_count, processing_s):
+    """Une ligne de synthèse par batch -> table batch_metrics (Grafana + latency_report.py)."""
+    stats = batch_df.agg(
+        F.avg("mse").alias("avg_mse"),
+        F.max("mse").alias("max_mse"),
+        F.percentile_approx("latency_ms", [0.5, 0.95, 0.99], 10000).alias("lat"),
+        F.max("latency_ms").alias("lat_max")
+    ).first()
+
+    p50, p95, p99 = stats["lat"] if stats["lat"] else (None, None, None)
+
+    def as_float(value):
+        return None if value is None else float(value)
+
+    row = (
+        "spark",
+        datetime.now(timezone.utc),
+        int(batch_id),
+        int(count),
+        int(alerts_count),
+        float(alerts_count) / count,
+        as_float(stats["avg_mse"]),
+        as_float(stats["max_mse"]),
+        as_float(p50),
+        as_float(p95),
+        as_float(p99),
+        as_float(stats["lat_max"]),
+        float(processing_s),
+        float(count) / processing_s if processing_s > 0 else None
+    )
+    metrics_df = batch_df.sparkSession.createDataFrame([row], schema=BATCH_METRICS_SCHEMA)
+
+    metrics_df.write \
+        .format("org.apache.spark.sql.cassandra") \
+        .option("keyspace", CASSANDRA_KEYSPACE) \
+        .option("table", TABLE_BATCH_METRICS) \
+        .mode("append") \
+        .save()
+
+    p95_text = "n/a" if p95 is None else f"{p95:.0f} ms"
+    print(f"[METRIQUES] latence p95 = {p95_text} | débit = {row[-1]:.0f} évts/s "
+          f"| traitement = {processing_s:.2f} s", flush=True)
 
 def write_to_cassandra(batch_df, batch_id):
+    started = time.time()
     batch_df.persist()
     count = batch_df.count()
 
@@ -333,6 +408,9 @@ def write_to_cassandra(batch_df, batch_id):
                 .mode("append") \
                 .save()
             print(f"[ALERTES] {alerts_count} anomalies enregistrées dans {CASSANDRA_KEYSPACE}.{TABLE_ALERTS}", flush=True)
+            
+        # 3. Ligne de synthèse du batch (latence, débit) -> batch_metrics 
+        write_batch_metrics(batch_df, batch_id, count, alerts_count, time.time() - started)
 
     batch_df.unpersist()
 
