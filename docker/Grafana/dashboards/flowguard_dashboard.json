@@ -197,6 +197,14 @@
           "target": "SELECT label, CAST(mse AS double), kafka_timestamp FROM flowguard.alerts WHERE dataset = '$dataset' AND kafka_timestamp > $__timeFrom AND kafka_timestamp < $__timeTo ALLOW FILTERING"
         }
       ],
+      "transformations": [
+        {
+          "id": "partitionByValues",
+          "options": { "fields": ["label"], "keepFields": false, "naming": { "asLabels": true } }
+        }
+      ],
+      "color": { "mode": "palette-classic" },
+      "displayName": "${__field.labels.label}",
       "options": {
         "legend": { "showLegend": true, "displayMode": "list", "placement": "right" },
         "tooltip": { "mode": "single", "sort": "none" }
@@ -309,9 +317,14 @@
         }
       ],
       "transformations": [
-        { "id": "seriesToRows", "options": {} },
-        { "id": "sortBy", "options": { "sort": [{ "field": "Time", "desc": true }] } },
-        { "id": "organize", "options": { "renameByName": { "Metric": "Real label", "Value": "MSE" } } }
+        { "id": "sortBy", "options": { "sort": [{ "field": "kafka_timestamp", "desc": true }] } },
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": { "kafka_timestamp": 0, "label": 1, "mse": 2 },
+            "renameByName": { "kafka_timestamp": "Time", "label": "Real label", "mse": "MSE" }
+          }
+        }
       ],
       "options": { "showHeader": true },
       "fieldConfig": { "defaults": { "decimals": 4 }, "overrides": [] }
