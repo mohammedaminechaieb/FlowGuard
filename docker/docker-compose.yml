@@ -45,6 +45,25 @@ services:
       retries: 20
       start_period: 60s
 
+  # One-shot job: creates/updates the Cassandra tables, then exits.
+  cassandra-init:
+    build:
+      context: ..
+      dockerfile: docker/spark.Dockerfile
+    image: flowguard-spark:latest
+    container_name: flowguard-cassandra-init
+    depends_on:
+      cassandra:
+        condition: service_healthy
+    working_dir: /opt/flowguard
+    environment:
+      CASSANDRA_HOST: cassandra
+    volumes:
+      - ../streaming:/opt/flowguard/streaming:ro
+    command: ["python", "streaming/cassandra_setup.py"]
+    restart: "no"
+
+
   spark:
     build:
       context: ..
@@ -56,6 +75,8 @@ services:
         condition: service_healthy
       cassandra:
         condition: service_healthy
+      cassandra-init:
+        condition: service_completed_successfully
     working_dir: /opt/flowguard
     ports:
       - "4040:4040"   # Spark UI
@@ -83,6 +104,40 @@ services:
       - /opt/flowguard/streaming/spark_consumer.py
     restart: on-failure:3
 
+  spark-archive:
+    image: flowguard-spark:latest
+    container_name: flowguard-spark-archive
+    profiles: ["archive"]
+    networks:
+      - default
+      - hadoop
+    depends_on:
+      kafka:
+        condition: service_healthy
+    working_dir: /opt/flowguard
+    ports:
+      - "4041:4040"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      ARCHIVE_PATH: hdfs://hadoop-master:9000/flowguard/archive
+      ARCHIVE_CHECKPOINT_PATH: hdfs://hadoop-master:9000/flowguard/checkpoints/archive_raw
+      HADOOP_USER_NAME: root
+      HOME: /tmp
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ../streaming:/opt/flowguard/streaming:ro
+      - ../checkpoints:/opt/flowguard/checkpoints
+    command:
+      - spark-submit
+      - --master
+      - local[2]
+      - --conf
+      - spark.jars.ivy=/opt/ivy
+      - --packages
+      - org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3
+      - /opt/flowguard/streaming/archive_raw_stream.py
+    restart: on-failure:3
+
   grafana:
     image: grafana/grafana:10.4.2
     container_name: grafana
@@ -97,6 +152,8 @@ services:
       GF_INSTALL_PLUGINS: hadesarchitect-cassandra-datasource
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./Grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./Grafana/dashboards:/etc/grafana/dashboards:ro
 
 volumes:
   cassandra_data:
@@ -105,3 +162,6 @@ volumes:
 networks:
   default:
     name: flowguard-net
+  hadoop:
+    external: true
+    name: hadoop
