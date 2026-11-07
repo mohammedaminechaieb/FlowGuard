@@ -1,0 +1,11 @@
+metric,value
+events_with_latency,1417
+latency_p50_ms,578661.4
+latency_p95_ms,586709.8
+latency_p99_ms,587892.73
+latency_mean_ms,578650.67
+latency_max_ms,588184.38
+batches,27
+flows_in_batches,13500
+sustained_throughput_eps,104.95
+processing_throughput_eps,614.48
