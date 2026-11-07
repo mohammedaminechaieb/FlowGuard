@@ -76,7 +76,7 @@ def sanity_check(scaler, threshold, session, cols):
     val = pd.read_parquet(os.path.join(PARQUET_DIR, "validation.parquet"))
     mse = score(val[cols].values.astype(np.float32), scaler, session)
     rate = (mse > threshold).mean()
-    print(f"  Validation flows above threshold: {rate:.2%}  (expected about 1%)")
+    print(f"  Validation flows above threshold: {rate:.2%}  (expected about 5%)")
     
 def load_test(cols): 
     df = pd.concat([pd.read_parquet(os.path.join(PARQUET_DIR, f)) 

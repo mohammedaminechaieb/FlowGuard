@@ -4,7 +4,8 @@
 # Owner       : Amine
 # Description : Fits a StandardScaler on the benign training split, then trains
 #               a PyTorch autoencoder (encoder-decoder) on those scaled flows.
-#               The anomaly threshold is chosen as the 99th-percentile MSE on
+#               The autoencoder is then used to detect anomalies in the validation set.
+#               The anomaly threshold is chosen as the 95th-percentile MSE on
 #               the benign validation split so that all attack days are unseen
 #               at threshold-selection time. Exports three artefacts used by the
 #               Spark streaming job.
@@ -176,8 +177,8 @@ def main():
     
     print("\n" + "=" * 60)
     print(f"Done. Artifacts saved to {ARTIFACTS_DIR}/")
-    print(f"  autoencoder.onnx  —  ONNX model")
-    print(f"  scaler.pkl        —  StandardScaler")
+    print("  autoencoder.onnx  —  ONNX model")
+    print("  scaler.pkl        —  StandardScaler")
     print(f"  threshold.json    —  MSE threshold = {threshold:.6f}")
     print("=" * 60)
     

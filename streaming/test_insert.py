@@ -1,9 +1,9 @@
 """
 File        : test_insert.py
-Description : Inserts a dummy flow record into Cassandra 'flowguard.alerts' 
+Description : Inserts a dummy flow record into Cassandra 'flowguard.alerts'
               and queries it back to verify end-to-end functionality.
+              Uses the partition dataset='test' so real data is not mixed in.
 """
-import uuid
 from datetime import datetime, timezone
 from cassandra.cluster import Cluster
 from cassandra.io.asyncioreactor import AsyncioConnection
@@ -21,59 +21,53 @@ def test_insert_and_read():
     )
     session = cluster.connect(KEYSPACE)
 
-    # 1. Create sample test row
-    now = datetime.now(timezone.utc)
-    today_bucket = now.strftime('%Y-%m-%d')
-    sample_flow_id = uuid.uuid4()
+    # 1. Create sample test row (same columns as spark_consumer.py writes).
+    #    Cassandra stores timestamps in milliseconds, so microseconds are dropped
+    #    to be able to read the row back with an exact match.
+    now = datetime.now(timezone.utc).replace(microsecond=0)
 
-    print(f"\n[1] Inserting test record...")
-    print(f"    Date Bucket : {today_bucket}")
-    print(f"    Flow ID     : {sample_flow_id}")
+    print("\n[1] Inserting test record...")
+    print(f"    Dataset     : test")
+    print(f"    Timestamp   : {now}")
 
     insert_query = """
         INSERT INTO alerts (
-            date_bucket, alert_time, flow_id,
-            mse_score, threshold, is_anomaly, predicted_label,
-            destination_port, flow_duration, total_fwd_packets, total_bwd_packets,
-            flow_bytes_s, label
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            dataset, kafka_timestamp, kafka_partition, kafka_offset,
+            event_id, label, mse, prediction, latency_ms
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
 
     session.execute(insert_query, (
-        today_bucket,
-        now,
-        sample_flow_id,
-        0.085,               # mse_score
-        0.050,               # threshold
-        True,                # is_anomaly
-        "ANOMALY_EXPLOIT",   # predicted_label
-        53,                  # destination_port
-        221692,              # flow_duration
-        1,                   # total_fwd_packets
-        1,                   # total_bwd_packets
-        875.088,             # flow_bytes_s
-        "BENIGN"             # dataset label
+        "test",              # dataset (partition key)
+        now,                 # kafka_timestamp
+        0,                   # kafka_partition
+        0,                   # kafka_offset
+        "test_0",            # event_id
+        "BENIGN",            # real label
+        0.085,               # mse
+        "ANOMALY",           # prediction
+        12.5                 # latency_ms
     ))
     print("    Insert successful!")
 
     # 2. Query back the inserted record
     print("\n[2] Reading record back from Cassandra...")
     select_query = """
-        SELECT date_bucket, alert_time, flow_id, mse_score, is_anomaly, predicted_label, destination_port
+        SELECT dataset, kafka_timestamp, event_id, label, mse, prediction, latency_ms
         FROM alerts
-        WHERE date_bucket = %s AND alert_time = %s AND flow_id = %s
+        WHERE dataset = %s AND kafka_timestamp = %s AND kafka_partition = %s AND kafka_offset = %s
     """
-    row = session.execute(select_query, (today_bucket, now, sample_flow_id)).one()
+    row = session.execute(select_query, ("test", now, 0, 0)).one()
 
     if row:
         print("\n--- RECORD VERIFIED IN DB ---")
-        print(f"Date Bucket      : {row.date_bucket}")
-        print(f"Alert Time       : {row.alert_time}")
-        print(f"Flow ID          : {row.flow_id}")
-        print(f"MSE Score        : {row.mse_score}")
-        print(f"Is Anomaly       : {row.is_anomaly}")
-        print(f"Predicted Label  : {row.predicted_label}")
-        print(f"Destination Port : {row.destination_port}")
+        print(f"Dataset          : {row.dataset}")
+        print(f"Kafka Timestamp  : {row.kafka_timestamp}")
+        print(f"Event ID         : {row.event_id}")
+        print(f"Label            : {row.label}")
+        print(f"MSE              : {row.mse}")
+        print(f"Prediction       : {row.prediction}")
+        print(f"Latency (ms)     : {row.latency_ms}")
         print("-----------------------------\n")
     else:
         print("\n[!] ERROR: Inserted record could not be retrieved.\n")

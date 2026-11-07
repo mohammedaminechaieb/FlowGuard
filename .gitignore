@@ -37,21 +37,12 @@ data/parquet/
 *.jsonl
 data/archive/
 
-# ML models
-models/
-*.pkl
-*.joblib
-*.onnx
-*.h5
-*.keras
-
 # Spark
 spark-warehouse/
 metastore_db/
 derby.log
 checkpoints/
 spark-checkpoints/
-artifacts/
 
 # Cassandra
 cassandra_data/
@@ -67,4 +58,3 @@ temp/
 # OS
 .DS_Store
 Thumbs.db
-results/per_attack_recall.csv

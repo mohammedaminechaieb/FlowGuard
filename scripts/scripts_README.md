@@ -6,11 +6,11 @@ Helper scripts for running the project.
 
 | File | Owner | Role |
 |---|---|---|
-| `submit_spark.sh` | **Mariem** | `spark-submit` wrapper — packages the Kafka connector, matches `SPARK_VERSION` |
+| `submit_spark.sh` | **Amine** | `spark-submit` wrapper for running the jobs outside Docker — adds the Kafka and Cassandra connectors |
 
 ## Usage
 
 ```bash
-export SPARK_VERSION=3.5.1
-bash scripts/submit_spark.sh
+bash scripts/submit_spark.sh                                   # inference job (default)
+bash scripts/submit_spark.sh streaming/archive_raw_stream.py   # archive job
 ```

@@ -52,12 +52,12 @@ services:
       dockerfile: docker/spark.Dockerfile
     image: flowguard-spark:latest
     container_name: flowguard-cassandra-init
+    environment:
+      CASSANDRA_HOST: cassandra
     depends_on:
       cassandra:
         condition: service_healthy
     working_dir: /opt/flowguard
-    environment:
-      CASSANDRA_HOST: cassandra
     volumes:
       - ../streaming:/opt/flowguard/streaming:ro
     command: ["python", "streaming/cassandra_setup.py"]
@@ -82,7 +82,6 @@ services:
       - "4040:4040"   # Spark UI
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      CASSANDRA_HOST: cassandra
       MODEL_DIR: /opt/flowguard/models
       CHECKPOINT_PATH: /opt/flowguard/checkpoints/spark_inference
       HOME: /tmp

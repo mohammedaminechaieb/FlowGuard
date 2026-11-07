@@ -36,7 +36,7 @@ from pyspark.sql.types import (
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 MODEL_DIR = Path(
-    os.getenv("MODEL_DIR", str(BASE_DIR / "models"))
+    os.getenv("MODEL_DIR", str(BASE_DIR / "ai_module" / "artifacts"))
 )
 
 SCALER_PATH = MODEL_DIR / "scaler.pkl"
@@ -59,7 +59,8 @@ CHECKPOINT_PATH = os.getenv(
     str(BASE_DIR / "checkpoints" / "spark_inference")
 )
 
-THRESHOLD = 0.03222443163394928
+with open(MODEL_DIR / "threshold.json", "r", encoding="utf-8") as file:
+    THRESHOLD = float(json.load(file)["threshold"])
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("FlowGuard")
@@ -125,10 +126,6 @@ def create_spark_session():
     return (
         SparkSession.builder
         .appName("FlowGuard-NIDS")
-        .config(
-            "spark.jars.packages",
-            "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3"
-        )
         .config("spark.sql.shuffle.partitions", "4")
         .getOrCreate()
     )
@@ -292,29 +289,8 @@ def run_inference(iterator):
             "latency_ms": latency_ms
         }) 
 
-
 # ============================================================
-# 9. BILAN PAR BATCH (diagnostic)
-# ============================================================
-
-def log_batch(batch_df, batch_id):
-
-    # persist() évite de relancer le modèle ONNX à chaque action ci-dessous.
-    batch_df.persist()
-
-    count = batch_df.count()
-
-    if count:
-        print(f"\n[BATCH {batch_id}] {count} événements scorés", flush=True)
-
-        batch_df.groupBy("label", "prediction").count().show(truncate=False)
-
-        batch_df.orderBy("kafka_offset").show(20, truncate=False)
-
-    batch_df.unpersist()
-
-# ============================================================
-# 7. EXPORT BATCH VERS CASSANDRA (TOUT LE FLUX + ALERTES)
+# 9. EXPORT BATCH VERS CASSANDRA (TOUT LE FLUX + ALERTES)
 # ============================================================
 TABLE_BATCH_METRICS = "batch_metrics"
 

@@ -24,7 +24,7 @@ Every member contributes to all modules. The table below shows who owns which fi
 |---|---|---|
 | `ai_module` | `kafka_producer.py` | Replay flows into Kafka with timestamps |
 | `ai_module` | `train_baselines.py` | Isolation Forest, One-Class SVM, Random Forest baselines |
-| `streaming` | `spark_processor.py` | Main Spark job: score flows with ONNX, write alerts + metrics to Cassandra |
+| `streaming` | `spark_processor.py` | Main Spark job: score flows with ONNX, write flows, alerts and batch metrics to Cassandra|
 
 ---
 
@@ -35,7 +35,7 @@ Every member contributes to all modules. The table below shows who owns which fi
 | `streaming` | `cassandra_setup.py` | Create Cassandra keyspace and tables |
 | `streaming` | `latency_report.py` | p50/p95/p99 latency and throughput report |
 | `scripts` | `submit_spark.sh` | spark-submit wrapper |
-| `docker` | `grafana/flowguard_dashboard.json` | Grafana dashboard |
+| `docker` | `Grafana/dashboards/flowguard_dashboard.json` | Grafana dashboard (provisioned automatically) |
 
 ---
 
@@ -55,7 +55,7 @@ Every member contributes to all modules. The table below shows who owns which fi
 ```
 Amine: prepare_data.py ──────────────────────────────────────────────┐
                                                                       ▼
-Eya:   train_autoencoder.py → artifacts/ ──► spark_processor.py ──► results/
+Eya:   train_autoencoder.py → artifacts/ ──► spark_consumer.py ──► results/
        train_baselines.py ─────────────────────────────────────────► evaluate.py (Mariem)
                                                                       ▲
 Amine: docker-compose up → kafka_producer.py ────────────────────────┘

@@ -39,11 +39,16 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", choices=list(DATASETS), default="wednesday")
     parser.add_argument("--n", type=int, default=20, help="Nombre de lignes à rejouer")
-    parser.add_argument("--model-dir", default=str(BASE_DIR / "models"))
-    parser.add_argument("--threshold", type=float, default=0.03222443163394928)
+    parser.add_argument("--model-dir", default=str(BASE_DIR / "ai_module" / "artifacts"))
+    parser.add_argument("--threshold", type=float, default=None,
+                        help="Seuil MSE (par défaut : valeur de threshold.json)")
     args = parser.parse_args()
 
     model_dir = Path(args.model_dir)
+    if args.threshold is None:
+        args.threshold = json.loads(
+            (model_dir / "threshold.json").read_text(encoding="utf-8")
+        )["threshold"]
     features = json.loads((model_dir / "feature_columns.json").read_text(encoding="utf-8"))
 
     parquet_file = pq.ParquetFile(PARQUET_DIR / DATASETS[args.dataset])

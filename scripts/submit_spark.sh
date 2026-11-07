@@ -3,14 +3,12 @@
 # File        : submit_spark.sh
 # Module      : scripts
 # Owner       : Mariem
-# Description : Wrapper around spark-submit that packages the Kafka connector
-#               JAR automatically using the --packages flag. The Spark version
-#               is read from the SPARK_VERSION environment variable (default
-#               3.5.1) so the script works with any compatible Spark image
-#               without editing the file.
-#               Run from the project root.
-# Input       : SPARK_VERSION env var (optional, default 3.5.1)
-#               streaming/spark_processor.py
+# Description : Wrapper around spark-submit for running the FlowGuard jobs
+#               outside Docker. Adds the Kafka and Cassandra connectors with
+#               --packages and sets the Cassandra host. Run from the project root.
+# Input       : SPARK_VERSION env var (optional, default 3.5.3)
+#               CASSANDRA_HOST env var (optional, default localhost)
+#               job file as first argument (default streaming/spark_consumer.py)
 # Output      : running Spark Structured Streaming job
 # =============================================================================
 set -euo pipefail
