@@ -10,10 +10,10 @@ Real-time pipeline: Kafka producer, Spark Structured Streaming jobs, Cassandra s
 | `spark_consumer.py` | **Eya** | Kafka → 78 features → scaler + ONNX autoencoder → MSE vs threshold → Cassandra: every flow to `all_flows`, anomalies to `alerts`, one summary row per batch to `batch_metrics` |
 | `archive_raw_stream.py` | **Amine** | Second Spark streaming job: Kafka → raw messages as Parquet on HDFS, partitioned by date |
 | `cassandra_setup.py` | **Mariem** | Create keyspace `flowguard` and tables `all_flows`, `alerts`, `batch_metrics` (run automatically by `cassandra-init`) |
-| `latency_report.py` | **Mariem** | Read latency and batch metrics from Cassandra, compute p50/p95/p99 latency and throughput, write to `results/` |
+| `latency_report.py` | **Amine** | Read latency and batch metrics from Cassandra, compute p50/p95/p99 latency and throughput, write to `results/` |
 | `test_insert.py` | **Mariem** | Smoke test: insert one row into `alerts` and read it back |
 | `sampled_cassandra_data.cql` | **Mariem** | Sample rows to test Grafana panels without running the stream (`cqlsh -f`) |
-| `requirements_streaming.txt` | **Amine** | Python dependencies for the scripts run on your PC |
+| `requirements_streaming.txt` | **Mariem** | Python dependencies for the scripts run on your PC |
 
 ## How to run
 

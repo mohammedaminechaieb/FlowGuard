@@ -1,7 +1,7 @@
 # =============================================================================
 # File        : evaluate.py
 # Module      : ai_module
-# Owner       : Mariem
+# Owner       : Amine
 # Description : Loads the test days (Wednesday and Friday attacks) and scores
 #               them with the autoencoder, Isolation Forest, One-Class SVM and
 #               Random Forest. Computes per-attack-family recall, false-positive

@@ -2,7 +2,7 @@
 # =============================================================================
 # File        : submit_spark.sh
 # Module      : scripts
-# Owner       : Mariem
+# Owner       : Amine
 # Description : Wrapper around spark-submit for running the FlowGuard jobs
 #               outside Docker. Adds the Kafka and Cassandra connectors with
 #               --packages and sets the Cassandra host. Run from the project root.
