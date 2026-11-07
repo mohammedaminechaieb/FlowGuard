@@ -1,0 +1,320 @@
+{
+  "uid": "flowguard-main",
+  "title": "FlowGuard - Network Intrusion Detection",
+  "tags": ["flowguard"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "5s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "dataset",
+        "label": "Dataset",
+        "type": "custom",
+        "query": "wednesday,tuesday,thursday,friday,train,validation",
+        "current": { "selected": true, "text": "wednesday", "value": "wednesday" },
+        "multi": false,
+        "includeAll": false,
+        "hide": 0
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Flows processed",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT pipeline, CAST(flows AS double), batch_time FROM flowguard.batch_metrics WHERE pipeline = 'spark' AND batch_time > $__timeFrom AND batch_time < $__timeTo ALLOW FILTERING"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "decimals": 0, "color": { "mode": "fixed", "fixedColor": "blue" } },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Anomalies detected",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT pipeline, CAST(anomalies AS double), batch_time FROM flowguard.batch_metrics WHERE pipeline = 'spark' AND batch_time > $__timeFrom AND batch_time < $__timeTo ALLOW FILTERING"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "decimals": 0, "color": { "mode": "fixed", "fixedColor": "red" } },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Latency p95 (last batch)",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT pipeline, latency_p95_ms, batch_time FROM flowguard.batch_metrics WHERE pipeline = 'spark' AND batch_time > $__timeFrom AND batch_time < $__timeTo ALLOW FILTERING"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 5000 },
+              { "color": "red", "value": 10000 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Throughput (avg per batch)",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT pipeline, throughput_eps, batch_time FROM flowguard.batch_metrics WHERE pipeline = 'spark' AND batch_time > $__timeFrom AND batch_time < $__timeTo ALLOW FILTERING"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["mean"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "value"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "suffix: evt/s", "decimals": 0, "color": { "mode": "fixed", "fixedColor": "purple" } },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Reconstruction error (MSE) per flow - $dataset (red line = anomaly threshold)",
+      "gridPos": { "x": 0, "y": 4, "w": 24, "h": 9 },
+      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT dataset, CAST(mse AS double), kafka_timestamp FROM flowguard.all_flows WHERE dataset = '$dataset' AND kafka_timestamp > $__timeFrom AND kafka_timestamp < $__timeTo ALLOW FILTERING"
+        }
+      ],
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "blue" },
+          "custom": {
+            "drawStyle": "points",
+            "pointSize": 4,
+            "showPoints": "always",
+            "scaleDistribution": { "type": "log", "log": 10 },
+            "thresholdsStyle": { "mode": "line" }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "transparent", "value": null },
+              { "color": "red", "value": 0.0322 }
+            ]
+          }
+        },
+        "overrides": [
+          { "matcher": { "id": "byFrameRefID", "options": "A" }, "properties": [{ "id": "displayName", "value": "MSE" }] }
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Anomalies by real label - $dataset",
+      "gridPos": { "x": 0, "y": 13, "w": 12, "h": 9 },
+      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT label, CAST(mse AS double), kafka_timestamp FROM flowguard.alerts WHERE dataset = '$dataset' AND kafka_timestamp > $__timeFrom AND kafka_timestamp < $__timeTo ALLOW FILTERING"
+        }
+      ],
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "list", "placement": "right" },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "points",
+            "pointSize": 5,
+            "showPoints": "always",
+            "scaleDistribution": { "type": "log", "log": 10 }
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "End-to-end latency per batch (producer send -> Spark score)",
+      "gridPos": { "x": 12, "y": 13, "w": 12, "h": 9 },
+      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT pipeline, latency_p50_ms, batch_time FROM flowguard.batch_metrics WHERE pipeline = 'spark' AND batch_time > $__timeFrom AND batch_time < $__timeTo ALLOW FILTERING"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT pipeline, latency_p95_ms, batch_time FROM flowguard.batch_metrics WHERE pipeline = 'spark' AND batch_time > $__timeFrom AND batch_time < $__timeTo ALLOW FILTERING"
+        },
+        {
+          "refId": "C",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT pipeline, latency_p99_ms, batch_time FROM flowguard.batch_metrics WHERE pipeline = 'spark' AND batch_time > $__timeFrom AND batch_time < $__timeTo ALLOW FILTERING"
+        }
+      ],
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "showPoints": "auto" }
+        },
+        "overrides": [
+          { "matcher": { "id": "byFrameRefID", "options": "A" }, "properties": [{ "id": "displayName", "value": "p50" }, { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] },
+          { "matcher": { "id": "byFrameRefID", "options": "B" }, "properties": [{ "id": "displayName", "value": "p95" }, { "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } }] },
+          { "matcher": { "id": "byFrameRefID", "options": "C" }, "properties": [{ "id": "displayName", "value": "p99" }, { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] }
+        ]
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Throughput per batch",
+      "gridPos": { "x": 0, "y": 22, "w": 12, "h": 8 },
+      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT pipeline, throughput_eps, batch_time FROM flowguard.batch_metrics WHERE pipeline = 'spark' AND batch_time > $__timeFrom AND batch_time < $__timeTo ALLOW FILTERING"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT pipeline, CAST(flows AS double), batch_time FROM flowguard.batch_metrics WHERE pipeline = 'spark' AND batch_time > $__timeFrom AND batch_time < $__timeTo ALLOW FILTERING"
+        }
+      ],
+      "options": {
+        "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "none" }
+      },
+      "fieldConfig": {
+        "defaults": { "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 } },
+        "overrides": [
+          { "matcher": { "id": "byFrameRefID", "options": "A" }, "properties": [{ "id": "displayName", "value": "events/s" }, { "id": "unit", "value": "suffix: evt/s" }] },
+          { "matcher": { "id": "byFrameRefID", "options": "B" }, "properties": [{ "id": "displayName", "value": "flows per batch" }, { "id": "custom.axisPlacement", "value": "right" }] }
+        ]
+      }
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Latest anomalies - $dataset",
+      "gridPos": { "x": 12, "y": 22, "w": 12, "h": 8 },
+      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT label, CAST(mse AS double), kafka_timestamp FROM flowguard.alerts WHERE dataset = '$dataset' AND kafka_timestamp > $__timeFrom AND kafka_timestamp < $__timeTo ALLOW FILTERING"
+        }
+      ],
+      "transformations": [
+        { "id": "seriesToRows", "options": {} },
+        { "id": "sortBy", "options": { "sort": [{ "field": "Time", "desc": true }] } },
+        { "id": "organize", "options": { "renameByName": { "Metric": "Real label", "Value": "MSE" } } }
+      ],
+      "options": { "showHeader": true },
+      "fieldConfig": { "defaults": { "decimals": 4 }, "overrides": [] }
+    }
+  ]
+}

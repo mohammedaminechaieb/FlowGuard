@@ -1,0 +1,13 @@
+apiVersion: 1
+
+datasources:
+  - name: FlowGuard Cassandra
+    uid: flowguard-cassandra
+    type: hadesarchitect-cassandra-datasource
+    access: proxy
+    url: cassandra:9042
+    isDefault: false
+    editable: true
+    jsonData:
+      keyspace: flowguard
+      consistency: ONE
