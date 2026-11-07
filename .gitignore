@@ -1,26 +1,69 @@
-# Spark
-checkpoints/
-spark-checkpoints/
-metastore_db/
-derby.log
-spark-warehouse/
-
-# Heavy data (download CICIDS2017 separately)
-data/*.csv
-data/parquet/
-
-# Local config
-.env
 
 # Python
 __pycache__/
-*.pyc
-.venv/
+*.py[cod]
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
 venv/
+.venv/
+env/
+ENV/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# Jupyter
 .ipynb_checkpoints/
 
-# Editors / OS
-.idea/
-.vscode/
+# Logs
+*.log
+logs/
+
+# CICIDS2017 datasets
+data/*.csv
+data/parquet/
+*.parquet
+*.jsonl
+
+# ML models
+models/
+*.pkl
+*.joblib
+*.onnx
+*.h5
+*.keras
+
+# Spark
+spark-warehouse/
+metastore_db/
+derby.log
+checkpoints/
+spark-checkpoints/
+artifacts/
+
+# Cassandra
+cassandra_data/
+*.sst
+*.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+
+# OS
 .DS_Store
 Thumbs.db
+results/per_attack_recall.csv
