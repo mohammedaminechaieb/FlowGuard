@@ -1,42 +1,46 @@
 # docker/
 
-Infrastructure: Kafka (KRaft), Cassandra 5.0, Grafana 10.4.
+Infrastructure: Kafka (KRaft), Cassandra 5.0, Spark 3.5 (Python 3.11, Java 17), Grafana 10.4.
 
 ## Files
 
 | File | Owner | Role |
 |---|---|---|
-| `docker-compose.yml` | **Amine** | Defines Kafka, Cassandra and Grafana services and the shared `flowguard-net` network |
-| `grafana/flowguard_dashboard.json` | **Mariem** | Exported Grafana dashboard — import via Grafana → Dashboards → Import |
-| `grafana/.gitkeep` | — | Keeps the folder in git before the dashboard is exported |
+| `docker-compose.yml` | **Amine** | All services and the shared `flowguard-net` network |
+| `spark.Dockerfile` | **Amine** | Spark image: Python 3.11, Java 17, PySpark 3.5.3 and the model libraries (versions match the artifacts) |
+| `Grafana/provisioning/` | **Mariem** | Cassandra data source and dashboard provider, loaded automatically at Grafana start |
+| `Grafana/dashboards/flowguard_dashboard.json` | **Mariem** | FlowGuard dashboard |
 
 ## Services
 
-| Service | Image | Port |
-|---|---|---|
-| `kafka` | `apache/kafka:3.8.0` (KRaft, no ZooKeeper) | `9092` (host), `29092` (inter-container) |
-| `cassandra` | `cassandra:5.0` | `9042` |
-| `grafana` | `grafana/grafana:10.4.0` | `3000` |
+| Service | Image | Port | Role |
+|---|---|---|---|
+| `kafka` | `apache/kafka:3.8.0` (KRaft) | `9092` (host), `29092` (containers) | Message broker |
+| `cassandra` | `cassandra:5.0` | `9042` | Flows, alerts and batch metrics |
+| `cassandra-init` | `flowguard-spark` | — | One-shot: creates/updates the tables, then exits |
+| `spark` | `flowguard-spark` | `4040` (Spark UI) | Inference job `streaming/spark_consumer.py` |
+| `spark-archive` | `flowguard-spark` | `4041` | Optional (profile `archive`): raw stream → HDFS |
+| `grafana` | `grafana/grafana:10.4.2` | `3000` | Dashboard |
 
 ## Quick start
 
 ```bash
 docker compose -f docker/docker-compose.yml up -d
+docker compose -f docker/docker-compose.yml ps -a     # cassandra-init should be "Exited (0)"
 ```
 
-Wait ~30 s for Cassandra to be ready, then create the schema:
+Open Grafana at http://localhost:3000 (admin / admin) → Dashboards → FlowGuard.
+The Cassandra plugin, data source and dashboard are installed automatically.
+
+HDFS archive (needs the class Hadoop containers running with HDFS started):
 
 ```bash
-python streaming/cassandra_setup.py
+docker compose -f docker/docker-compose.yml --profile archive up -d spark-archive
 ```
-
-Open Grafana at http://localhost:3000 (admin / admin).
-Install the Cassandra plugin: Grafana → Plugins → search `cassandra` → install `hadesarchitect-cassandra-datasource`.
-Then import `grafana/flowguard_dashboard.json` via Grafana → Dashboards → Import.
 
 ## Notes
 
-- `GF_SECURITY_ADMIN_PASSWORD=admin` — demo only, change for any real deployment.
+- `GF_SECURITY_ADMIN_PASSWORD=admin` — demo only.
 - Cassandra data is persisted in the `cassandra_data` Docker volume.
-- If Spark runs in a container, attach it to `flowguard-net` and use `cassandra:9042` and `kafka:29092`.
-- Wait for Cassandra's healthcheck to pass before running `cassandra_setup.py`.
+- After a table change, reset once with `docker exec cassandra cqlsh -e "DROP KEYSPACE IF EXISTS flowguard;"`, then `up -d` again.
+- Model files are mounted read-only from `ai_module/artifacts/`.

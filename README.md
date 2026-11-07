@@ -12,7 +12,7 @@ The autoencoder is trained offline only on benign traffic (Monday capture). Ever
 
 ## Architecture
 
-    CICIDS2017 CSV -> kafka_producer.py -> Kafka -> Spark Structured Streaming (ONNX autoencoder) -> Cassandra -> Grafana
+       CICIDS2017 CSV -> prepare_data.py -> Parquet -> kafka_producer.py -> Kafka -> Spark Structured Streaming (ONNX autoencoder) -> Cassandra -> Grafana
                                              |
                                              +-> Spark -> HDFS (Parquet archive) -> offline training and evaluation
 
@@ -43,46 +43,42 @@ The autoencoder is trained offline only on benign traffic (Monday capture). Ever
 ## Prerequisites
 
 - Docker Desktop
-- Python 3.10 or 3.11
-- The spark-hadoop image (Spark 3.5.x and HDFS). Check with `spark-submit --version`.
+- Python 3.10 or newer (on Python 3.12+, `pyasyncore` from the requirements is needed by cassandra-driver)
+- For the HDFS archive only: the class Hadoop containers (`hadoop-master`, `hadoop-slave1`, `hadoop-slave2`) with HDFS started
 - CICIDS2017 CSV files from https://www.unb.ca/cic/datasets/ids-2017.html, placed in `data/`
   (Monday for training, Wednesday and Friday for the simulated attack stream)
 
 ## Quick start
 
-1. Configuration
-
-       Copy-Item .env.example .env
-
-2. Start Kafka, Cassandra and Grafana
-
-       docker compose -f docker/docker-compose.yml up -d
-
-3. Create the Cassandra schema (wait ~30s for Cassandra to be ready first)
-
-       pip install -r streaming/requirements_streaming.txt
-       python streaming/cassandra_setup.py
-
-4. Prepare the data and train the model
+1. Prepare the data and train the model (only needed if you change the model:
+   the trained artifacts are already committed in `ai_module/artifacts/`)
 
        pip install -r ai_module/requirements_ai.txt
        python ai_module/prepare_data.py
        python ai_module/train_autoencoder.py
 
-   This produces `autoencoder.onnx`, `scaler.pkl` and `threshold.json` in `ai_module/artifacts/`.
+2. Start the stack: Kafka, Cassandra, Grafana and the Spark job.
+   `cassandra-init` creates the keyspace and tables automatically before Spark starts.
 
-5. Start the Spark streaming job (on the Spark image, with SPARK_VERSION matching it)
+       docker compose -f docker/docker-compose.yml up -d
+       docker compose -f docker/docker-compose.yml ps -a
 
-       bash scripts/submit_spark.sh
+3. Replay flows into Kafka (separate terminal)
 
-6. Start the producer
+       pip install -r streaming/requirements_streaming.txt
+       python streaming/kafka_producer.py --dataset wednesday --max-events 20000 --delay 0.02
 
-       python streaming/kafka_producer.py
+4. Watch the stream: `docker logs -f flowguard-spark`, or open Grafana at http://localhost:3000
+   (admin / admin) → Dashboards → FlowGuard. The Cassandra data source and the dashboard
+   are provisioned automatically from `docker/Grafana/`.
 
-7. Open Grafana at http://localhost:3000 (admin / admin), install the Cassandra plugin
-   (`hadesarchitect-cassandra-datasource`) and import `docker/grafana/flowguard_dashboard.json`.
+5. Latency and throughput report (after the stream has run)
 
-If Spark runs inside a container, attach it to the `flowguard-net` network and use `kafka:29092` and `cassandra:9042` in `.env`.
+       python streaming/latency_report.py --minutes 30
+
+6. Optional: archive the raw stream to HDFS (class Hadoop containers running, HDFS started)
+
+       docker compose -f docker/docker-compose.yml --profile archive up -d spark-archive
 
 ## What we measure
 
@@ -101,9 +97,9 @@ If Spark runs inside a container, attach it to the `flowguard-net` network and u
 
 | Member | Responsibility |
 |---|---|
-| Amine | Data preparation, Autoencoder Training, HDFS archive, Docker infrastructure |
+| Amine | Data preparation, Autoencoder Training, HDFS archive, Docker infrastructure and automatisation, latency report |
 | Eya | Kafka Producer, ONNX export, baselines, Spark streaming job, Cassandra setup |
-| Mariem | Evaluation, latency report, Grafana dashboard, spark-submit wrapper |
+| Mariem | Evaluation,  Grafana dashboard, spark-submit wrapper |
 
 ## Demo and documents
 
