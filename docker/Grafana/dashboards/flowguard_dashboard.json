@@ -152,8 +152,11 @@
           "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT dataset, CAST(mse AS double), kafka_timestamp FROM flowguard.all_flows WHERE dataset = '$dataset' AND kafka_timestamp > $__timeFrom AND kafka_timestamp < $__timeTo ALLOW FILTERING"
+          "target": "SELECT dataset, CAST(mse AS double), scored_at FROM flowguard.all_flows WHERE dataset = '$dataset' AND scored_at > $__timeFrom AND scored_at < $__timeTo LIMIT 50000 ALLOW FILTERING"
         }
+      ],
+      "transformations": [
+        { "id": "sortBy", "options": { "sort": [{ "field": "scored_at" }] } }
       ],
       "options": {
         "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom" },
@@ -182,7 +185,7 @@
         ]
       }
     },
-    {
+        {
       "id": 6,
       "type": "timeseries",
       "title": "Anomalies by real label - $dataset",
@@ -194,17 +197,17 @@
           "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT label, CAST(mse AS double), kafka_timestamp FROM flowguard.alerts WHERE dataset = '$dataset' AND kafka_timestamp > $__timeFrom AND kafka_timestamp < $__timeTo ALLOW FILTERING"
+          "target": "SELECT label, CAST(mse AS double), scored_at FROM flowguard.alerts WHERE dataset = '$dataset' AND scored_at > $__timeFrom AND scored_at < $__timeTo LIMIT 50000 ALLOW FILTERING"
         }
       ],
       "transformations": [
+        { "id": "merge", "options": {} },
+        { "id": "sortBy", "options": { "sort": [{ "field": "scored_at" }] } },
         {
           "id": "partitionByValues",
           "options": { "fields": ["label"], "keepFields": false, "naming": { "asLabels": true } }
         }
       ],
-      "color": { "mode": "palette-classic" },
-      "displayName": "${__field.labels.label}",
       "options": {
         "legend": { "showLegend": true, "displayMode": "list", "placement": "right" },
         "tooltip": { "mode": "single", "sort": "none" }
@@ -212,6 +215,7 @@
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
+          "displayName": "${__field.labels.label}",
           "custom": {
             "drawStyle": "points",
             "pointSize": 5,
@@ -313,16 +317,17 @@
           "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
           "queryType": "query",
           "rawQuery": true,
-          "target": "SELECT label, CAST(mse AS double), kafka_timestamp FROM flowguard.alerts WHERE dataset = '$dataset' AND kafka_timestamp > $__timeFrom AND kafka_timestamp < $__timeTo ALLOW FILTERING"
+          "target": "SELECT label, CAST(mse AS double), scored_at FROM flowguard.alerts WHERE dataset = '$dataset' AND scored_at > $__timeFrom AND scored_at < $__timeTo LIMIT 500 ALLOW FILTERING"
         }
       ],
       "transformations": [
-        { "id": "sortBy", "options": { "sort": [{ "field": "kafka_timestamp", "desc": true }] } },
+        { "id": "merge", "options": {} },
+        { "id": "sortBy", "options": { "sort": [{ "field": "scored_at", "desc": true }] } },
         {
           "id": "organize",
           "options": {
-            "indexByName": { "kafka_timestamp": 0, "label": 1, "mse": 2 },
-            "renameByName": { "kafka_timestamp": "Time", "label": "Real label", "mse": "MSE" }
+            "indexByName": { "scored_at": 0, "label": 1, "mse": 2 },
+            "renameByName": { "scored_at": "Scored at", "label": "Real label", "mse": "MSE" }
           }
         }
       ],
