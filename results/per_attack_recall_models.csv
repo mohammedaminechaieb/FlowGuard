@@ -1,0 +1,15 @@
+Label,flows,Autoencoder (ours),Isolation Forest,One-Class SVM,Random Forest (supervised)
+Bot,989,0.0334,0.0243,0.0465,0.6107
+DDoS,64010,0.6361,0.1746,0.6362,0.9994
+DoS GoldenEye,5118,0.8972,0.1147,0.8839,0.9971
+DoS Hulk,86700,0.9013,0.8168,0.9011,0.9982
+DoS Slowhttptest,2644,0.9501,0.2375,0.9346,0.9936
+DoS slowloris,2667,0.6355,0.5523,0.613,0.9944
+FTP-Patator,3003,0.0007,0.0,0.0007,0.999
+Heartbleed,6,1.0,1.0,1.0,0.5
+Infiltration,17,0.8824,0.8235,0.8824,0.0
+PortScan,45195,0.5138,0.0013,0.0151,0.9999
+SSH-Patator,1636,0.0018,0.0,0.0012,0.9841
+Web Attack � Brute Force,733,0.0532,0.0505,0.0532,0.9918
+Web Attack � Sql Injection,6,0.0,0.0,0.0,0.3333
+Web Attack � XSS,330,0.0333,0.0242,0.0303,0.9455
