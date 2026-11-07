@@ -4,20 +4,21 @@
 # Owner       : Mariem
 # Description : Creates the Cassandra keyspace and tables used by the project
 #               with explicit schemas so that Grafana can query them correctly.
-#                 - flowguard.alerts  : one row per flagged (anomalous) flow
-#                 - flowguard.metrics : one row per Spark micro-batch
-#                   (batch_id, record count, mean MSE, p50/p95/p99 latency)
-#               Partition key includes a time bucket to avoid unbounded
-#               partitions for a single attacking host.
+#                 - flowguard.all_flows     : every scored flow
+#                 - flowguard.alerts        : flows predicted as ANOMALY
+#                 - flowguard.batch_metrics : one row per Spark micro-batch
+#                   (flows, anomalies, MSE, latency p50/p95/p99, throughput)
+#               Partition key = dataset (all_flows, alerts) or pipeline
+#               (batch_metrics); rows ordered newest first.
 #               Safe to re-run: uses IF NOT EXISTS on all CREATE statements.
-# Input       : .env  (CASSANDRA_HOST, CASSANDRA_KEYSPACE)
-# Output      : Cassandra keyspace flowguard with tables alerts and metrics
+#               Run automatically by the cassandra-init service in Docker.
+# Input       : env CASSANDRA_HOST, CASSANDRA_PORT, CASSANDRA_KEYSPACE
+# Output      : Cassandra keyspace flowguard with tables all_flows, alerts, batch_metrics
 # =============================================================================
 # Cassandra test code 
 # NOT FOR DEPLOYMENT JUST FOR TESTING PURPOSES :)
 
 import os
-import time
 from cassandra.cluster import Cluster
 
 
