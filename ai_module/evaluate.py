@@ -33,7 +33,9 @@ import pyarrow.parquet as pq
 from sklearn.metrics import (precision_score, 
                             recall_score,f1_score, fbeta_score,
                             roc_auc_score, average_precision_score, 
-                            confusion_matrix)
+                            confusion_matrix, roc_curve, precision_recall_curve)
+
+from train_baselines import BASELINE_DIR, rf_train_mask, baseline_scores
 
 DATA_DIR = os.environ.get("DATA_DIR", "data")
 PARQUET_DIR = os.path.join(DATA_DIR, "parquet")
@@ -45,6 +47,13 @@ TEST_FILES = ["test_tuesday.parquet",
             "test_thursday.parquet", 
             "test_friday.parquet"]
 BATCH = 50_000
+
+MODEL_NAMES = {
+    "autoencoder": "Autoencoder (ours)",
+    "iforest": "Isolation Forest",
+    "ocsvm": "One-Class SVM",
+    "rf": "Random Forest (supervised)",
+}
 
 def load_artifacts():
     with open(os.path.join(ARTIFACTS_DIR, "scaler.pkl"), "rb") as f:
@@ -116,17 +125,118 @@ def evaluate(mse, labels, threshold):
                 .agg(recall="mean", flows="count").sort_values("recall"))
     return results, per_attack
 
+# ---------------------------------------------------------------- model comparison
+
+def load_baselines():
+    path = os.path.join(BASELINE_DIR, "thresholds.json")
+    if not os.path.exists(path):
+        return None, None
+    with open(path, "r") as f:
+        thresholds = json.load(f)
+    models = {}
+    for name in ("iforest", "ocsvm", "rf"):
+        with open(os.path.join(BASELINE_DIR, f"{name}.pkl"), "rb") as f:
+            models[name] = pickle.load(f)
+    return models, thresholds
+
+
+def plot_curves(curves, path_roc, path_pr):
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ImportError:
+        print("[INFO] matplotlib not installed: no figures written.")
+        return
+
+    fig, ax = plt.subplots(figsize=(6.5, 5))
+    for name, (y_true, s) in curves.items():
+        fpr, tpr, _ = roc_curve(y_true, s)
+        ax.plot(fpr, tpr, label=f"{MODEL_NAMES[name]} (AUC {roc_auc_score(y_true, s):.3f})")
+    ax.plot([0, 1], [0, 1], "k--", linewidth=0.8)
+    ax.set_xlabel("False-positive rate")
+    ax.set_ylabel("True-positive rate (recall)")
+    ax.set_title("ROC curves - held-out test flows")
+    ax.legend(loc="lower right", fontsize=8)
+    fig.tight_layout()
+    fig.savefig(path_roc, dpi=150)
+    plt.close(fig)
+
+    fig, ax = plt.subplots(figsize=(6.5, 5))
+    for name, (y_true, s) in curves.items():
+        precision, recall, _ = precision_recall_curve(y_true, s)
+        ax.plot(recall, precision,
+                label=f"{MODEL_NAMES[name]} (AP {average_precision_score(y_true, s):.3f})")
+    ax.set_xlabel("Recall")
+    ax.set_ylabel("Precision")
+    ax.set_title("Precision-recall curves - held-out test flows")
+    ax.legend(loc="lower left", fontsize=8)
+    fig.tight_layout()
+    fig.savefig(path_pr, dpi=150)
+    plt.close(fig)
+    print(f"Figures written to {path_roc} and {path_pr}")
+
+
+def compare_models(X, labels, mse, scaler, ae_threshold):
+    models, thresholds = load_baselines()
+    if models is None:
+        print("\n[INFO] No baselines found: run ai_module/train_baselines.py "
+              "to add the model comparison.")
+        return
+
+    print("\nComparing models on the held-out half of the test days ...")
+    held_out = ~rf_train_mask(len(X))
+    X_eval = scaler.transform(X[held_out]).astype(np.float32)
+    labels_eval = labels[held_out].reset_index(drop=True)
+    y_true = (labels_eval != "BENIGN").astype(int).values
+
+    scores = {"autoencoder": mse[held_out]}
+    model_thresholds = {"autoencoder": ae_threshold}
+    for name, model in models.items():
+        print(f"  scoring {MODEL_NAMES[name]} ...")
+        scores[name] = baseline_scores(name, model, X_eval)
+        model_thresholds[name] = thresholds[name]
+
+    rows, per_attack_all, curves = [], {}, {}
+    for name, s in scores.items():
+        res, per_attack = evaluate(s, labels_eval, model_thresholds[name])
+        rows.append({"model": MODEL_NAMES[name],
+                     **{k: res[k] for k in ("precision", "recall", "f1", "f2",
+                                            "false_positive_rate", "roc_auc", "pr_auc")}})
+        per_attack_all[MODEL_NAMES[name]] = per_attack["recall"]
+        curves[name] = (y_true, s)
+
+    table = pd.DataFrame(rows).set_index("model").round(4)
+    per_attack_table = pd.DataFrame(per_attack_all).round(4)
+    per_attack_table.insert(0, "flows", per_attack.reindex(per_attack_table.index)["flows"])
+
+    print("\nModel comparison (held-out test flows):")
+    print(table.to_string())
+    print("\nPer-attack-family recall per model:")
+    print(per_attack_table.to_string())
+
+    table.to_csv(os.path.join(RESULTS_DIR, "model_comparison.csv"))
+    per_attack_table.to_csv(os.path.join(RESULTS_DIR, "per_attack_recall_models.csv"))
+    print(f"\nTables written to {RESULTS_DIR}/model_comparison.csv "
+          f"and per_attack_recall_models.csv")
+
+    plot_curves(curves,
+                os.path.join(RESULTS_DIR, "roc_curves.png"),
+                os.path.join(RESULTS_DIR, "pr_curves.png"))
+
+
 def main():
     print("=" * 60)
     print("FlowGuard - evaluate.py")
     print("=" * 60)
-    
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+
     scaler, threshold, session = load_artifacts()
     cols = feature_columns()
-    
+
     print("Sanity check ...")
     sanity_check(scaler, threshold, session, cols)
-    
+
     print('Loading test data ...')
     X, labels = load_test(cols)
     mse = score(X, scaler, session)
@@ -139,11 +249,13 @@ def main():
     print("\nPer-attack-family recall:")
     print(per_attack.to_string())
     
-    with open(os.path.join(RESULTS_DIR, "metrics_table.json"), "w") as f:    
+    with open(os.path.join(RESULTS_DIR, "metrics_table.json"), "w") as f:
         json.dump(results, f, indent=2)
     per_attack.to_csv(os.path.join(RESULTS_DIR, "per_attack_recall.csv"))
     print(f"\nResults written to {RESULTS_DIR}/metrics_table.json and per_attack_recall.csv")
-    
+
+    compare_models(X, labels, mse, scaler, threshold)
+
 if __name__ == "__main__":
     main()
     
