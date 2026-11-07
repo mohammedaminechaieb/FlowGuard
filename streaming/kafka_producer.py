@@ -120,6 +120,7 @@ def stream_parquet(
             event = {
                 "event_id": event_id,
                 "dataset": dataset_name,
+                "send_ts": time.time(),
                 "features": features,
                 "label": record.get("Label"),
             }
