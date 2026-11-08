@@ -2,7 +2,7 @@ apiVersion: 1
 
 providers:
   - name: FlowGuard
-    folder: FlowGuard
+    folder: ''
     type: file
     disableDeletion: false
     allowUiUpdates: true
