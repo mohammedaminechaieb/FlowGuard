@@ -121,6 +121,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       ARCHIVE_PATH: hdfs://hadoop-master:9000/flowguard/archive
       ARCHIVE_CHECKPOINT_PATH: hdfs://hadoop-master:9000/flowguard/checkpoints/archive_raw
+      ARCHIVE_TRIGGER_INTERVAL: ${ARCHIVE_TRIGGER_INTERVAL:-30 seconds}
       HADOOP_USER_NAME: root
       HOME: /tmp
       PYTHONUNBUFFERED: "1"

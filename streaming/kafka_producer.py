@@ -25,6 +25,7 @@ DATASETS = {
     "wednesday": "test_wednesday.parquet",
     "thursday": "test_thursday.parquet",
     "friday": "test_friday.parquet",
+    "demo": "test_demo.parquet",
 }
 
 

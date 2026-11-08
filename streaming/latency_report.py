@@ -32,7 +32,7 @@ CASSANDRA_PORT = int(os.getenv("CASSANDRA_PORT", "9042"))
 KEYSPACE = os.getenv("CASSANDRA_KEYSPACE", "flowguard")
 
 # Dataset names used by kafka_producer.py (= partition keys of all_flows).
-DATASETS = ["train", "validation", "tuesday", "wednesday", "thursday", "friday"]
+DATASETS = ["train", "validation", "tuesday", "wednesday", "thursday", "friday", "demo"]
 
 
 def parse_args():

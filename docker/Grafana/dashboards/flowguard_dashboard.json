@@ -20,11 +20,11 @@
         "name": "dataset",
         "label": "Dataset",
         "type": "custom",
-        "query": "wednesday,tuesday,thursday,friday,train,validation",
+        "query": "demo,wednesday,tuesday,thursday,friday,train,validation",
         "current": {
           "selected": true,
-          "text": "wednesday",
-          "value": "wednesday"
+          "text": "demo",
+          "value": "demo"
         },
         "multi": false,
         "includeAll": false,
