@@ -166,13 +166,14 @@ if (-not $SkipHdfs) {
 Start-Sleep -Seconds 10   # let the streaming queries subscribe to Kafka
 
 # ------------------------------------------------------------------ 7. Grafana
+# ------------------------------------------------------------------ 7. Grafana
 Step 7 "Grafana dashboard"
 Wait-Until "Grafana" {
     try { (Invoke-WebRequest -UseBasicParsing "http://localhost:3000/api/health" -TimeoutSec 3).StatusCode -eq 200 } catch { $false }
 } 120
 $grafanaUrl = "http://localhost:3000/d/flowguard-main?orgId=1&var-dataset=$Dataset&from=now-15m&to=now&refresh=5s"
-Write-Host "PS> Start-Process `"$grafanaUrl`"" -ForegroundColor Cyan
-Start-Process $grafanaUrl
+Write-Host "   Grafana is ready - open it yourself when you want:" -ForegroundColor Green
+Write-Host "   $grafanaUrl" -ForegroundColor Magenta
 Write-Host "   Login: admin / admin (click 'Skip' on the password change)" -ForegroundColor Magenta
 
 # ------------------------------------------------------------------ 8. Producer
