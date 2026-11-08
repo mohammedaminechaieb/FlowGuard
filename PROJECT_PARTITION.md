@@ -33,7 +33,7 @@ Every member contributes to all modules. The table below shows who owns which fi
 
 ---
 
-## Mariem — Cassandra & Grafana prototype
+## Mariem — Cassandra & Grafana dashboard
 
 | Module | File | Task |
 |---|---|---|
@@ -41,7 +41,7 @@ Every member contributes to all modules. The table below shows who owns which fi
 | `streaming` | `test_insert.py` | Cassandra smoke test |
 | `streaming` | `sampled_cassandra_data.cql` | Sample rows for testing Grafana |
 | `streaming` | `requirements_streaming.txt` | Streaming module dependencies |
-| `docker` | Grafana (UI) | First dashboard prototype built manually in Grafana, used to validate the Cassandra queries |
+| `docker` | `Grafana/dashboards/flowguard_dashboard.json` | Dashboard design (with Amine): first prototype in the Grafana UI, traffic-per-day and benign-vs-anomaly pie charts |
 
 ---
 
@@ -61,7 +61,7 @@ Every member contributes to all modules. The table below shows who owns which fi
 ```
 Amine: prepare_data.py ──► train_autoencoder.py ──► ai_module/artifacts/ ──┐
                                                                             ▼
-Amine: docker compose up (cassandra-init ◄─ Mariem: cassandra_setup.py) ──► Eya: spark_consumer.py ──► Cassandra ──► Grafana (Mariem: prototype, Amine: dashboard as code)
+Amine: docker compose up (cassandra-init ◄─ Mariem: cassandra_setup.py) ──► Eya: spark_consumer.py ──► Cassandra ──► Grafana (Mariem, Amine)
 Eya:   kafka_producer.py ──► Kafka ──┘                                     │
                                      └──► Amine: archive_raw_stream.py ──► HDFS
 Amine: evaluate.py, latency_report.py ──► results/
