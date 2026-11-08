@@ -1,14 +1,19 @@
 {
   "uid": "flowguard-main",
   "title": "FlowGuard - Network Intrusion Detection",
-  "tags": ["flowguard"],
+  "tags": [
+    "flowguard"
+  ],
   "timezone": "browser",
   "schemaVersion": 39,
   "version": 1,
   "editable": true,
   "graphTooltip": 1,
   "refresh": "5s",
-  "time": { "from": "now-1h", "to": "now" },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
   "templating": {
     "list": [
       {
@@ -16,7 +21,11 @@
         "label": "Dataset",
         "type": "custom",
         "query": "wednesday,tuesday,thursday,friday,train,validation",
-        "current": { "selected": true, "text": "wednesday", "value": "wednesday" },
+        "current": {
+          "selected": true,
+          "text": "wednesday",
+          "value": "wednesday"
+        },
         "multi": false,
         "includeAll": false,
         "hide": 0
@@ -141,10 +150,82 @@
       }
     },
     {
+      "id": 10,
+      "title": "Traffic Count per Day",
+      "type": "piechart",
+      "gridPos": { "x": 0, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT dataset, count(event_id) FROM flowguard.all_flows GROUP BY dataset;"
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "pieType": "pie",
+        "tooltip": { "mode": "single", "sort": "none" },
+        "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "hideFrom": { "tooltip": false, "viz": false, "legend": false } },
+          "color": { "mode": "palette-classic" },
+          "mappings": []
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 11,
+      "title": "Benign VS Anomaly",
+      "type": "piechart",
+      "gridPos": { "x": 12, "y": 4, "w": 12, "h": 8 },
+      "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
+          "queryType": "query",
+          "rawQuery": true,
+          "target": "SELECT prediction, event_id FROM flowguard.all_flows;"
+        }
+      ],
+      "transformations": [
+        { "id": "merge", "options": {} },
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "event_id": { "aggregations": ["count"], "operation": "aggregate" },
+              "prediction": { "aggregations": [], "operation": "groupby" }
+            }
+          }
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": true, "calcs": ["lastNotNull"], "fields": "" },
+        "pieType": "pie",
+        "tooltip": { "mode": "single", "sort": "none" },
+        "legend": { "showLegend": true, "displayMode": "list", "placement": "bottom" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "hideFrom": { "tooltip": false, "viz": false, "legend": false } },
+          "color": { "mode": "palette-classic" },
+          "mappings": []
+        },
+        "overrides": []
+      }
+    },
+    {
       "id": 5,
       "type": "timeseries",
       "title": "Reconstruction error (MSE) per flow - $dataset (red line = anomaly threshold)",
-      "gridPos": { "x": 0, "y": 4, "w": 24, "h": 9 },
+      "gridPos": { "x": 0, "y": 12, "w": 24, "h": 9 },
       "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
       "targets": [
         {
@@ -185,11 +266,11 @@
         ]
       }
     },
-        {
+    {
       "id": 6,
       "type": "timeseries",
       "title": "Anomalies by real label - $dataset",
-      "gridPos": { "x": 0, "y": 13, "w": 12, "h": 9 },
+      "gridPos": { "x": 0, "y": 21, "w": 12, "h": 9 },
       "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
       "targets": [
         {
@@ -230,7 +311,7 @@
       "id": 7,
       "type": "timeseries",
       "title": "End-to-end latency per batch (producer send -> Spark score)",
-      "gridPos": { "x": 12, "y": 13, "w": 12, "h": 9 },
+      "gridPos": { "x": 12, "y": 21, "w": 12, "h": 9 },
       "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
       "targets": [
         {
@@ -275,7 +356,7 @@
       "id": 8,
       "type": "timeseries",
       "title": "Throughput per batch",
-      "gridPos": { "x": 0, "y": 22, "w": 12, "h": 8 },
+      "gridPos": { "x": 0, "y": 30, "w": 12, "h": 8 },
       "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
       "targets": [
         {
@@ -309,7 +390,7 @@
       "id": 9,
       "type": "table",
       "title": "Latest anomalies - $dataset",
-      "gridPos": { "x": 12, "y": 22, "w": 12, "h": 8 },
+      "gridPos": { "x": 12, "y": 30, "w": 12, "h": 8 },
       "datasource": { "type": "hadesarchitect-cassandra-datasource", "uid": "flowguard-cassandra" },
       "targets": [
         {
