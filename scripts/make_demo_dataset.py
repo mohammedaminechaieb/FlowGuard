@@ -43,8 +43,8 @@ def main():
 
     attacks = pd.concat(attacks)
     # A family present on several days keeps at most --per-attack flows in total
-    attacks = attacks.groupby("Label", group_keys=False).apply(
-        lambda g: g.sample(n=min(args.per_attack, len(g)), random_state=args.seed))
+    attacks = pd.concat([g.sample(n=min(args.per_attack, len(g)), random_state=args.seed)
+                        for _, g in attacks.groupby("Label")])
     benign = pd.concat(benign).sample(frac=1, random_state=args.seed)
 
     calm = benign.iloc[:args.calm]
