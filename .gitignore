@@ -57,6 +57,7 @@ tmp/
 temp/
 *.tmp
 *.bak
+*.mp4
 
 # OS
 .DS_Store

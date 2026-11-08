@@ -91,7 +91,7 @@ function Get-HdfsLiveNodes {
 }
 
 # ------------------------------------------------------------------ 0. checks
-$Datasets = $Dataset -split "," | ForEach-Object { $_.Trim().ToLower() } | Where-Object { $_ }
+$Datasets = @($Dataset -split "," | ForEach-Object { $_.Trim().ToLower() } | Where-Object { $_ })
 $valid = @("demo", "tuesday", "wednesday", "thursday", "friday", "train", "validation")
 $expected = 0
 foreach ($d in $Datasets) {
@@ -220,7 +220,6 @@ Start-Sleep -Seconds 6   # last batch_metrics row
 Step 10 "Latency and throughput report"
 $minutes = [int][Math]::Ceiling(((Get-Date) - $StartTime).TotalMinutes) + 1
 Run "$Python streaming/latency_report.py --minutes $minutes"
-Run "Start-Process results\latency_distribution.png" -AllowFail
 
 # ------------------------------------------------------------------ 11. HDFS archive
 if (-not $SkipHdfs) {
